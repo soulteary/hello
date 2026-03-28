@@ -9,7 +9,7 @@
 Either grab a build on the [releases page](https://github.com/jmhobbs/terminal-parrot/releases) or clone and run...
 
 ```bash
-$ go get -u github.com/jmhobbs/terminal-parrot
+$ go install github.com/jmhobbs/terminal-parrot@latest
 $ terminal-parrot
 ```
 
