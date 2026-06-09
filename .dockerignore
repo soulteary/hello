@@ -1,0 +1,28 @@
+# Keep the docker build context tiny: only ship sources needed by the
+# Go builder stage. Everything else (tests, docs, local artifacts, CI)
+# is irrelevant inside the container.
+
+# VCS / IDE
+.git
+.github
+.gitignore
+.idea
+.vscode
+.DS_Store
+
+# Docs and meta
+README.md
+README.zh-CN.md
+LICENSE
+
+# Local build outputs
+hello
+hello.exe
+*.test
+*.out
+coverage.*
+dist
+bin
+
+# Tests are not needed for the runtime image
+*_test.go

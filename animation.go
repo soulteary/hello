@@ -31,8 +31,11 @@ func LoadFromBytes(b []byte) (*Animation, error) {
 
 	frames := bytes.Split(b, separator)
 
-	if len(frames) <= 2 {
-		return nil, fmt.Errorf("no frames found")
+	// Split yields N+1 segments for N separators. We need at least one
+	// metadata header plus 2 frames (an "animation" with a single frame is
+	// just a static picture, not worth the framework around it).
+	if len(frames) < 3 {
+		return nil, fmt.Errorf("invalid animation: need a metadata header and at least 2 frames, got %d segment(s)", len(frames))
 	}
 
 	// The first "frame" is actually the metadata.

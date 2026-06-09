@@ -1,109 +1,100 @@
-[![terminal-parrot](https://snapcraft.io/terminal-parrot/badge.svg)](https://snapcraft.io/terminal-parrot) [![🧪 Snap Builds](https://github.com/kz6fittycent/terminal-parrot/actions/workflows/test-snap-can-build.yml/badge.svg)](https://github.com/kz6fittycent/terminal-parrot/actions/workflows/test-snap-can-build.yml)
+# hello
 
-# :parrot: for your terminal
+A drop-in replacement for `docker/hello-world`, but with a party parrot.
 
-![demo](http://dropit.velvetcache.org.s3.amazonaws.com/jmhobbs/NzczFOYq4g/termbox-parrot-color.gif)
+[中文文档 / Chinese README](README.zh-CN.md)
 
-## Installing
-
-Either grab a build on the [releases page](https://github.com/jmhobbs/terminal-parrot/releases) or clone and run...
+## Usage
 
 ```bash
-$ go install github.com/jmhobbs/terminal-parrot@latest
-$ terminal-parrot
+docker run --rm soulteary/hello
 ```
 
-### Nix
-
-#### nix-env
+Or pull from GitHub Container Registry:
 
 ```bash
-nix-env -i terminal-parrot
+docker run --rm ghcr.io/soulteary/hello
 ```
 
-#### nix-profile
+Examples:
 
 ```bash
-nix profile install nixpkgs#terminal-parrot
-```
-    
-### Homebrew
+# Default: the classic Party Parrot, looping forever
+docker run --rm soulteary/hello
 
-There is a tap for this as well, it's `jmhobbs/parrot`
+# Run the parrot for exactly 3 loops, then exit
+docker run --rm soulteary/hello -loops 3
 
-    brew tap jmhobbs/parrot
-    brew install terminal-parrot
-    
-### Snap Install
-
-```$ sudo snap install terminal-parrot```
-
-The command will be installed as `parrot`, rather than `terminal-parrot`.
-
-### Snap Install
-
-```$ sudo snap install terminal-parrot```
-
-### Docker
-
-The image is available on [docker hub](https://hub.docker.com/r/jmhobbs/terminal-parrot/)
-
-    docker pull jmhobbs/terminal-parrot
-    docker run -it --rm jmhobbs/terminal-parrot:latest
-
-You can also build a docker image locally and run it in a container with...
-
-    docker build -t partyparrot ./
-    docker run -it --rm partyparrot (-args)
-
-### Quitting
-
-Hit the escape or "q" key to quit.
-
-### -loops
-
-You can limit your parrots enthusiasm with the `-loops` flag.
-
-### :fastparrot:
-
-Set the frame delay with the `-delay` flag (defaults to 75, use 25 for :fastparrot:)
-
-### :aussieparrot:
-
-Use `-orientation aussie` for our friends down under.
-
-## Adding Animations
-
-You can add additional animations without re-compiling by adding a plain text file somewhere on the path (by default `/etc/terminal-parrot` or `/opt/homebrew/etc/terminal-parrot`).
-
-This file should contain the frames, separated by lines containing `!--FRAME--!`.  The filename must end with `.animation`.
-
-The first segment of the file is reserved for metadata, which is key-value pairs separated by `:`.
-
-For example, the following file, named `test.animation` would add a new animation called `test`:
-
-```
-description: A test animation!
-!--FRAME--!
-[ Frame One ]
-!--FRAME--!
-[ Frame Two ]
-!--FRAME--!
-[ Frame Three ]
+# Pick a different animation and disable rainbow colors
+docker run --rm soulteary/hello -mono cat
 ```
 
-Then you can run `terminal-parrot test` to see your new animation (assuming it's on the path).
+## Animations
 
-![Demo of custom animations](parrot-file-demo.gif)
+| Name      | Description                       |
+| --------- | --------------------------------- |
+| `parrot`  | The classic Party Parrot.         |
+| `cat`     | A bouncing cat.                   |
+| `coffee`  | A steaming cup of coffee.         |
+| `loading` | A simple loading spinner.         |
+| `pedro`   | Pedro the raccoon.                |
 
-## Thanks
+The animation name is passed as a positional argument, e.g.
+`docker run --rm soulteary/hello cat`. If omitted, `parrot` is used.
 
-Idea from seeing [this tweet from @rachsmithtweets](https://twitter.com/rachsmithtweets/status/742785722290212868)
+## Flags
 
-Thanks to [termbox-go](https://github.com/nsf/termbox-go) for making it easy.
+| Flag         | Description                              | Default |
+| ------------ | ---------------------------------------- | ------- |
+| `-a`, `-animation` | Animation name (overrides positional). | `""`    |
+| `-loops`     | Number of loops, `0` for infinite.       | `0`     |
+| `-delay`     | Frame delay in milliseconds (must be > 0). | `75`  |
+| `-mono`      | Disable rainbow colors.                  | `false` |
+| `-list`      | List all available animations and exit.  | `false` |
+| `-version`   | Print version and exit.                  | `false` |
 
-Thanks to [jp2a](https://csl.name/jp2a/) for nice ASCII art conversion.
+## Notes
 
-Thanks to [erinking](https://github.com/erinking) for [fixing colors and animation frames](https://github.com/jmhobbs/terminal-parrot/pull/15)
+The output relies on ANSI escape sequences. If your terminal does not support
+them, the animation will look garbled — consider running with `-loops 1` so it
+exits quickly instead of looping forever.
 
-Thanks to [pdevine](https://github.com/pdevine) for the [Dockerfile](https://github.com/jmhobbs/terminal-parrot/pull/12) (and [robbyoconnor](https://github.com/robbyoconnor) for reviving the PR I let go stale)
+## Development
+
+This project is a single-file Go module with no third-party dependencies.
+
+```bash
+make help         # list all available targets
+make build        # build the ./hello binary
+make test         # run tests with -race
+make cover        # run tests and print coverage summary
+make check        # gofmt + vet + tests (CI-equivalent)
+make docker       # build a local Docker image
+```
+
+CI runs `go vet`, `gofmt -l`, `go test -race` on every push and PR
+(`.github/workflows/test.yml`). The Docker image is built and published from
+`main` and from `v*` tags (`.github/workflows/docker.yml`).
+
+## Credits
+
+This project is a heavily refactored fork of
+[jmhobbs/hello-parrot](https://github.com/jmhobbs/hello-parrot) by
+[John Hobbs](https://github.com/jmhobbs), originally released in 2016.
+
+Thanks to the original author for the lovely party parrot. The current
+distribution adds Docker packaging, additional animations, a pluggable
+animation loader, configuration flags, and a full test suite.
+
+## License
+
+Released under the [MIT License](LICENSE).
+
+- Copyright (c) 2016 John Hobbs — original work
+- Copyright (c) 2026 soulteary — modifications and additions
+
+When redistributing this project (including binaries and Docker images), the
+`LICENSE` and `NOTICE` files must be included so that all copyright notices
+and attribution are preserved, as required by the MIT License. See
+[`NOTICE`](NOTICE) for the full attribution list, including third-party
+ASCII assets shipped under `animations/`.

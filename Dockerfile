@@ -1,13 +1,59 @@
-FROM golang:alpine
-WORKDIR /project
-RUN apk update && apk add --no-cache git
-COPY go.* ./
-RUN go mod download
+# syntax=docker/dockerfile:1.7
+
+# ---------- build stage ----------
+# Pin a Go version that matches go.mod's `go 1.26.4` directive.
+FROM --platform=$BUILDPLATFORM golang:1.26.4-alpine AS build
+
+# TARGETOS/TARGETARCH are provided by buildx for multi-arch builds.
+ARG TARGETOS
+ARG TARGETARCH
+ARG VERSION=dev
+
+WORKDIR /src
+
+# Cache module downloads in a separate layer. go.sum is optional today
+# (no third-party deps yet) but copying via a glob keeps this future-proof.
+COPY go.mod go.su[m] ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+# Copy only what the binary actually needs: sources + embedded animations.
+# Tests, docs, snap config etc. are excluded via .dockerignore.
 COPY *.go ./
-RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o parrot .
+COPY animations/ ./animations/
 
+# Static, stripped, reproducible single binary. CGO is disabled so the
+# resulting ELF has no glibc/musl dependency and runs on `scratch`.
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build \
+        -trimpath \
+        -buildvcs=false \
+        -ldflags="-s -w -X main.version=${VERSION}" \
+        -o /out/hello .
+
+# ---------- runtime stage ----------
+# `scratch` is empty: the final image contains exactly one file,
+# /hello. Animations are embedded inside the binary via `go:embed`.
 FROM scratch
-COPY --from=0 /project/parrot /parrot
-COPY animations/ /etc/terminal-parrot
-ENTRYPOINT ["/parrot"]
 
+ARG VERSION=dev
+ARG REVISION=unknown
+ARG CREATED
+
+LABEL org.opencontainers.image.title="hello" \
+      org.opencontainers.image.description="Drop-in replacement for hello-world, with a party parrot." \
+      org.opencontainers.image.url="https://github.com/soulteary/hello" \
+      org.opencontainers.image.source="https://github.com/soulteary/hello" \
+      org.opencontainers.image.documentation="https://github.com/soulteary/hello#readme" \
+      org.opencontainers.image.authors="soulteary <soulteary@gmail.com>" \
+      org.opencontainers.image.vendor="soulteary" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}" \
+      org.opencontainers.image.created="${CREATED}"
+
+COPY --from=build /out/hello /hello
+
+ENTRYPOINT ["/hello"]

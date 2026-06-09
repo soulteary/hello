@@ -1,0 +1,41 @@
+hello
+=====
+
+This product includes software originally developed by:
+
+  * John Hobbs (https://github.com/jmhobbs) — original "hello-parrot" project
+    released in 2016 under the MIT License.
+    Upstream: https://github.com/jmhobbs/hello-parrot
+
+Modifications and additions in this distribution are:
+
+  * Copyright (c) 2026 soulteary <https://github.com/soulteary>
+
+The combined work continues to be distributed under the MIT License. See the
+LICENSE file for the full license text and all copyright notices that must be
+preserved when redistributing this software (in source form, as a binary,
+or as a container image).
+
+Third-party assets
+------------------
+
+The ASCII artwork shipped under ./animations/ is included for the sole purpose
+of being rendered by this program. Where the artwork originates from a known
+upstream, attribution is given here:
+
+  * animations/parrot.animation
+      The "Party Parrot" ASCII rendition originates from
+      jmhobbs/hello-parrot (MIT, 2016).
+
+  * animations/pedro.animation
+      Pedro the raccoon, an internet meme rendered as ASCII art.
+      No exclusive authorship is claimed by this project; it is included
+      as a community asset.
+
+  * animations/cat.animation
+    animations/coffee.animation
+    animations/loading.animation
+      Original simple ASCII art created for this project.
+
+If you believe an asset in this repository is missing proper attribution,
+please open an issue and it will be corrected.

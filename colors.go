@@ -1,17 +1,17 @@
 package main
 
-import "github.com/nsf/termbox-go"
-
-var colors = []termbox.Attribute{
-	// approx colors from original gif
-	termbox.Attribute(210), // peach
-	termbox.Attribute(222), // orange
-	termbox.Attribute(120), // green
-	termbox.Attribute(123), // cyan
-	termbox.Attribute(111), // blue
-	termbox.Attribute(134), // purple
-	termbox.Attribute(177), // pink
-	termbox.Attribute(207), // fuschia
-	termbox.Attribute(206), // magenta
-	termbox.Attribute(204), // red
+// colors holds the 256-color palette indices used for cycling the rainbow
+// foreground in non-mono mode. The numeric values map to the standard
+// xterm 256-color cube and are emitted via the SGR escape `\x1b[38;5;<n>m`.
+var colors = []int{
+	210, // peach
+	222, // orange
+	120, // green
+	123, // cyan
+	111, // blue
+	134, // purple
+	177, // pink
+	207, // fuschia
+	206, // magenta
+	204, // red
 }

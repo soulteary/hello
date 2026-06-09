@@ -4,95 +4,94 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
+	"sort"
 	"time"
-
-	isatty "github.com/mattn/go-isatty"
-	"github.com/nsf/termbox-go"
 )
 
+// version is overridden at build time via -ldflags "-X main.version=...".
+// "dev" is a sensible default for `go run` and unstamped local builds.
+var version = "dev"
+
+const usageExamples = `
+Examples:
+  hello                      # play the default parrot animation
+  hello pedro                # play the pedro animation (positional arg)
+  hello -a cat               # play the cat animation (named flag)
+  hello -animation coffee    # long form of -a
+  hello -list                # list all available animations
+  hello -mono -delay 120     # disable rainbow, slower frames
+  hello -loops 3 pedro       # play pedro for 3 loops then exit
+`
+
 func main() {
-	framePath := flag.String("path", "/etc/terminal-parrot;/opt/homebrew/etc/terminal-parrot", "path to additional frame files")
 	loops := flag.Int("loops", 0, "number of times to loop (default: infinite)")
-	delay := flag.Int("delay", 75, "frame delay in ms")
-	orientation := flag.String("orientation", "regular", "regular or aussie")
+	mono := flag.Bool("mono", false, "disable rainbow colors")
+	delay := flag.Int("delay", 75, "frame delay in ms (must be > 0)")
 	list := flag.Bool("list", false, "list available animations and exit")
+	showVersion := flag.Bool("version", false, "print version and exit")
+
+	var animationFlag string
+	flag.StringVar(&animationFlag, "animation", "", "animation name to play (overrides positional argument)")
+	flag.StringVar(&animationFlag, "a", "", "animation name to play (shorthand for -animation)")
+
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags] [animation]\n\nFlags:\n", os.Args[0])
+		flag.PrintDefaults()
+		fmt.Fprint(flag.CommandLine.Output(), usageExamples)
+	}
+
 	flag.Parse()
 
-	animation := "parrot"
-	if len(flag.Args()) > 0 {
-		animation = flag.Args()[0]
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
+
+	if *delay <= 0 {
+		fmt.Fprintln(os.Stderr, "delay must be > 0")
+		os.Exit(2)
 	}
 
 	inventory := NewInventory()
 
-	if err := inventory.LoadFromPaths(strings.Split(*framePath, ";")); err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading animations: %v\n", err)
-		os.Exit(1)
-	}
-
 	if *list {
-		fmt.Println("Available animations:")
-		fmt.Println("")
-		longestName := 0
-		for name := range inventory {
-			longestName = max(longestName, len(name))
+		for _, name := range availableAnimations(inventory) {
+			fmt.Println(name)
 		}
-		fmtString := fmt.Sprintf("  %% %ds : %%s\n", longestName)
-
-		for name, animation := range inventory {
-			description := ""
-			if mdDescription, ok := animation.Metadata["description"]; ok {
-				description = mdDescription
-			}
-			fmt.Printf(fmtString, name, description)
-		}
-		os.Exit(0)
+		return
 	}
 
-	if _, ok := inventory[animation]; !ok {
-		fmt.Fprintf(os.Stderr, "Animation %q not found\n", animation)
+	animationName := pickAnimationName(animationFlag, flag.Args(), "parrot")
+
+	animation, ok := inventory[animationName]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "Animation %q not found. Available: %v\n",
+			animationName, availableAnimations(inventory))
 		os.Exit(1)
 	}
 
-	if !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()) {
-		fmt.Fprintf(os.Stderr, "%s must be run in a terminal!\n", filepath.Base(os.Args[0]))
-		os.Exit(1)
+	renderer := NewRenderer(os.Stdout, *mono)
+	stop, cleanup := installSignalHandler()
+	defer cleanup()
+
+	renderer.Begin()
+	defer renderer.End()
+
+	runLoop(renderer, animation, loopOptions{
+		loops:      *loops,
+		frameDelay: time.Duration(*delay) * time.Millisecond,
+		stop:       stop,
+	})
+}
+
+// availableAnimations returns the sorted list of animation names present in
+// the inventory. Sorting keeps the -list output and error messages stable
+// across runs and platforms.
+func availableAnimations(inv Inventory) []string {
+	names := make([]string, 0, len(inv))
+	for name := range inv {
+		names = append(names, name)
 	}
-
-	err := termbox.Init()
-	if err != nil {
-		panic(err)
-	}
-	defer termbox.Close()
-
-	event_queue := make(chan termbox.Event)
-	go func() {
-		for {
-			event_queue <- termbox.PollEvent()
-		}
-	}()
-
-	termbox.SetOutputMode(termbox.Output256)
-
-	loop_index := 0
-	draw(inventory[animation], *orientation)
-
-loop:
-	for {
-		select {
-		case ev := <-event_queue:
-			if (ev.Type == termbox.EventKey && (ev.Key == termbox.KeyEsc || ev.Key == termbox.KeyCtrlC || ev.Ch == 'q')) || ev.Type == termbox.EventInterrupt {
-				break loop
-			}
-		default:
-			loop_index++
-			if *loops > 0 && (loop_index/9) >= *loops {
-				break loop
-			}
-			draw(inventory[animation], *orientation)
-			time.Sleep(time.Duration(*delay) * time.Millisecond)
-		}
-	}
+	sort.Strings(names)
+	return names
 }
