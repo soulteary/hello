@@ -4,7 +4,7 @@
 
 ## English
 
-Animations live under [`animations/`](../animations) as `*.animation` files and
+Animations live under [`internal/animation/assets/animations/`](../internal/animation/assets/animations) as `*.animation` files and
 are embedded into the binary at build time via `go:embed`. The base name of the
 file (without the `.animation` suffix) becomes the animation name used on the
 command line, e.g. `cat.animation` is played with `hello cat`.
@@ -49,7 +49,7 @@ documentation/attribution aids. When adding third-party artwork, also update
 
 ### Minimal example
 
-A complete two-frame example (see [`animations/coffee.animation`](../animations/coffee.animation)
+A complete two-frame example (see [`coffee.animation`](../internal/animation/assets/animations/coffee.animation)
 for a real one):
 
 ```
@@ -66,7 +66,7 @@ license: MIT
 
 ## 中文
 
-动画文件位于 [`animations/`](../animations) 目录下，以 `*.animation` 结尾，并在
+动画文件位于 [`internal/animation/assets/animations/`](../internal/animation/assets/animations) 目录下，以 `*.animation` 结尾，并在
 构建时通过 `go:embed` 嵌入到二进制中。文件去掉 `.animation` 后缀后的名字即为命令
 行使用的动画名，例如 `cat.animation` 通过 `hello cat` 播放。
 
@@ -107,7 +107,7 @@ license: MIT
 ### 最小示例
 
 一个完整的两帧示例（真实示例见
-[`animations/coffee.animation`](../animations/coffee.animation)）：
+[`coffee.animation`](../internal/animation/assets/animations/coffee.animation)）：
 
 ```
 description: a tiny blinking dot

@@ -1,4 +1,4 @@
-package main
+package render
 
 // colors holds the 256-color palette indices used for cycling the rainbow
 // foreground in non-mono mode. The numeric values map to the standard

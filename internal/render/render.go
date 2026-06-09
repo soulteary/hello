@@ -1,9 +1,11 @@
-package main
+package render
 
 import (
 	"bytes"
 	"fmt"
 	"io"
+
+	"github.com/soulteary/hello/internal/animation"
 )
 
 // ANSI control sequences used by the renderer. They are kept as exported
@@ -54,15 +56,15 @@ func (r *Renderer) End() {
 // and the cursor is advanced after a successful write. In color mode the
 // active palette entry wraps around the cursor on every line; the caller is
 // responsible for invoking AdvanceColor on the desired cadence.
-func (r *Renderer) Draw(animation Animation) {
-	if len(animation.Frames) == 0 {
+func (r *Renderer) Draw(anim animation.Animation) {
+	if len(anim.Frames) == 0 {
 		return
 	}
-	idx := r.frameIdx % len(animation.Frames)
+	idx := r.frameIdx % len(anim.Frames)
 	if idx < 0 {
-		idx += len(animation.Frames)
+		idx += len(anim.Frames)
 	}
-	frame := animation.Frames[idx]
+	frame := anim.Frames[idx]
 	lines := bytes.Split(frame, []byte{'\n'})
 
 	var buf bytes.Buffer
@@ -90,7 +92,7 @@ func (r *Renderer) Draw(animation Animation) {
 
 	_, _ = r.out.Write(buf.Bytes())
 	r.frameIdx++
-	if r.frameIdx >= len(animation.Frames) {
+	if r.frameIdx >= len(anim.Frames) {
 		r.frameIdx = 0
 	}
 }

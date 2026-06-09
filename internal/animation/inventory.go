@@ -1,4 +1,4 @@
-package main
+package animation
 
 import (
 	"embed"
@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-//go:embed animations/*
+//go:embed assets/animations/*
 var animations embed.FS
 
 // Inventory is the in-memory catalog of animations keyed by their base name
@@ -40,7 +40,7 @@ func (i Inventory) LoadFromFS(filesystem fs.FS) error {
 // that indicates a build-time bug, not a runtime condition.
 func NewInventory() Inventory {
 	i := make(Inventory)
-	sub, err := fs.Sub(animations, "animations")
+	sub, err := fs.Sub(animations, "assets/animations")
 	if err != nil {
 		panic(err)
 	}

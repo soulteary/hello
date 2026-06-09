@@ -17,10 +17,9 @@ COPY go.mod go.su[m] ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# Copy only what the binary actually needs: sources + embedded animations.
-# Tests, docs, snap config etc. are excluded via .dockerignore.
-COPY *.go ./
-COPY animations/ ./animations/
+# Copy the full module: sources, embedded assets and go files. Tests, docs,
+# local artifacts and CI are excluded via .dockerignore.
+COPY . .
 
 # Static, stripped, reproducible single binary. CGO is disabled so the
 # resulting ELF has no glibc/musl dependency and runs on `scratch`.
@@ -31,7 +30,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
         -trimpath \
         -buildvcs=false \
         -ldflags="-s -w -X main.version=${VERSION}" \
-        -o /out/hello .
+        -o /out/hello ./cmd/hello
 
 # ---------- runtime stage ----------
 # distroless/static:nonroot is a tiny (~2 MB) base that ships CA certs, tzdata

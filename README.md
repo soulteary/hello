@@ -140,4 +140,4 @@ When redistributing this project (including binaries and Docker images), the
 `LICENSE` and `NOTICE` files must be included so that all copyright notices
 and attribution are preserved, as required by the MIT License. See
 [`NOTICE`](NOTICE) for the full attribution list, including third-party
-ASCII assets shipped under `animations/`.
+ASCII assets shipped under `internal/animation/assets/animations/`.

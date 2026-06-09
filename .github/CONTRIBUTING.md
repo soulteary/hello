@@ -33,7 +33,7 @@ commit where practical.
 
 ## Adding a new animation
 
-1. Create `animations/<name>.animation` following the format described in
+1. Create `internal/animation/assets/animations/<name>.animation` following the format described in
    [`docs/animation-format.md`](../docs/animation-format.md): a metadata header,
    then at least two non-empty frames separated by `!--FRAME--!`.
 2. Include a `description:` metadata line — it shows up in `hello -list`.

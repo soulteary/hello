@@ -133,5 +133,5 @@ CI 会在每次 push / PR 时运行 `go vet`、`gofmt -l`、`go test -race`
 
 再次分发本项目时（包括二进制与 Docker 镜像），请同时保留 `LICENSE` 和
 `NOTICE` 文件，以确保所有版权与署名信息都得到完整传递 —— 这是 MIT 许可证
-的硬性要求。完整的署名清单（含 `animations/` 下第三方 ASCII 素材）见
+的硬性要求。完整的署名清单（含 `internal/animation/assets/animations/` 下第三方 ASCII 素材）见
 [`NOTICE`](NOTICE)。

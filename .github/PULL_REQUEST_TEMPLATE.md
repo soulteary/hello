@@ -19,7 +19,7 @@
 - [ ] If a new animation was added: `description` metadata set, README tables
       updated, and `NOTICE` updated for any third-party artwork
 - [ ] If the Docker image is affected: built locally and verified it runs
-- [ ] `CHANGELOG.md` updated under `Unreleased`
+- [ ] `docs/CHANGELOG.md` updated under `Unreleased`
 
 ## Notes for reviewers
 

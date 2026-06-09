@@ -1,4 +1,4 @@
-package main
+package e2e
 
 import (
 	"flag"
@@ -33,7 +33,7 @@ func TestMain(m *testing.M) {
 	if runtime.GOOS == "windows" {
 		bin += ".exe"
 	}
-	build := exec.Command("go", "build", "-o", bin, ".")
+	build := exec.Command("go", "build", "-o", bin, "github.com/soulteary/hello/cmd/hello")
 	if out, err := build.CombinedOutput(); err != nil {
 		panic("failed to build test binary: " + err.Error() + "\n" + string(out))
 	}

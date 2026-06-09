@@ -61,7 +61,7 @@ jobs:
             -trimpath \
             -buildvcs=false \
             -ldflags="-s -w -X main.version=${VERSION}" \
-            -o "dist/${bin}" .
+            -o "dist/${bin}" ./cmd/hello
 
           stem="hello_${VERSION}_${GOOS}_${GOARCH}"
           pushd dist >/dev/null
@@ -109,13 +109,13 @@ jobs:
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
           notes_file="$(mktemp)"
-          # Pull the section for this version out of CHANGELOG.md; fall back to
+          # Pull the section for this version out of docs/CHANGELOG.md; fall back to
           # a generic message if no matching header is found.
           awk -v ver="${version}" '
             $0 ~ "^## \\[" ver "\\]" {flag=1; next}
             flag && /^## \[/ {flag=0}
             flag {print}
-          ' CHANGELOG.md > "${notes_file}" || true
+          ' docs/CHANGELOG.md > "${notes_file}" || true
           if [[ ! -s "${notes_file}" ]]; then
             echo "Release ${GITHUB_REF_NAME}." > "${notes_file}"
           fi

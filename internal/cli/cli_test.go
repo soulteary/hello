@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"bytes"
@@ -6,6 +6,9 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/soulteary/hello/internal/animation"
+	"github.com/soulteary/hello/internal/render"
 )
 
 func Test_SelectAnimation(t *testing.T) {
@@ -52,7 +55,7 @@ func Test_PickAnimationName(t *testing.T) {
 }
 
 func Test_AvailableAnimations_SortedAndComplete(t *testing.T) {
-	inv := Inventory{
+	inv := animation.Inventory{
 		"pedro":  {},
 		"cat":    {},
 		"parrot": {},
@@ -65,7 +68,7 @@ func Test_AvailableAnimations_SortedAndComplete(t *testing.T) {
 }
 
 func Test_AvailableAnimations_Empty(t *testing.T) {
-	got := availableAnimations(Inventory{})
+	got := availableAnimations(animation.Inventory{})
 	if len(got) != 0 {
 		t.Errorf("expected empty slice, got %v", got)
 	}
@@ -90,10 +93,10 @@ func Test_RunLoop_DrawsExactlyLoopsTimesFrames(t *testing.T) {
 			for i := range frames {
 				frames[i] = []byte{'x'}
 			}
-			anim := Animation{Frames: frames}
+			anim := animation.Animation{Frames: frames}
 
 			var buf bytes.Buffer
-			r := NewRenderer(&buf, true)
+			r := render.NewRenderer(&buf, true)
 
 			runLoop(r, anim, loopOptions{
 				loops:      tc.loops,
@@ -113,8 +116,8 @@ func Test_RunLoop_DrawsExactlyLoopsTimesFrames(t *testing.T) {
 
 func Test_RunLoop_EmptyAnimationReturnsImmediately(t *testing.T) {
 	var buf bytes.Buffer
-	r := NewRenderer(&buf, true)
-	runLoop(r, Animation{}, loopOptions{loops: 1, frameDelay: time.Millisecond})
+	r := render.NewRenderer(&buf, true)
+	runLoop(r, animation.Animation{}, loopOptions{loops: 1, frameDelay: time.Millisecond})
 	if buf.Len() != 0 {
 		t.Errorf("expected no output, got %q", buf.String())
 	}
@@ -125,11 +128,11 @@ func Test_RunLoop_EmptyAnimationReturnsImmediately(t *testing.T) {
 // SIGINT teardown path that main() relies on.
 func Test_RunLoop_StopChannelInterrupts(t *testing.T) {
 	frames := [][]byte{[]byte("x"), []byte("y")}
-	anim := Animation{Frames: frames}
+	anim := animation.Animation{Frames: frames}
 
 	stop := make(chan os.Signal, 1)
 	var buf bytes.Buffer
-	r := NewRenderer(&buf, true)
+	r := render.NewRenderer(&buf, true)
 
 	done := make(chan struct{})
 	go func() {

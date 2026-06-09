@@ -1,4 +1,4 @@
-package main
+package animation
 
 import (
 	"os"
@@ -6,7 +6,7 @@ import (
 )
 
 func Test_LoadFromFile(t *testing.T) {
-	a, err := LoadFromFile(os.DirFS("animations"), "parrot.animation")
+	a, err := LoadFromFile(os.DirFS("assets/animations"), "parrot.animation")
 	if err != nil {
 		t.Fatal(err)
 	}

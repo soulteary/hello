@@ -1,8 +1,7 @@
-package main
+package animation
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
 	"io/fs"
 	"strings"

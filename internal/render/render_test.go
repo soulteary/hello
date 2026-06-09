@@ -1,14 +1,16 @@
-package main
+package render
 
 import (
 	"bytes"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/soulteary/hello/internal/animation"
 )
 
-func twoFrameAnim() Animation {
-	return Animation{
+func twoFrameAnim() animation.Animation {
+	return animation.Animation{
 		Metadata: nil,
 		Frames:   [][]byte{[]byte("AB"), []byte("CD")},
 	}
@@ -103,7 +105,7 @@ func Test_Renderer_AdvanceColorNoOpInMono(t *testing.T) {
 func Test_Renderer_DrawEmptyAnimationIsNoop(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, true)
-	r.Draw(Animation{})
+	r.Draw(animation.Animation{})
 	if buf.Len() != 0 {
 		t.Errorf("expected no output for empty animation, got %q", buf.String())
 	}

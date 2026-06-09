@@ -1,6 +1,7 @@
 SHELL          := /usr/bin/env bash
 BINARY         := hello
 PKG            := ./...
+FUZZPKG        := ./internal/animation
 GOFILES        := $(shell find . -type f -name '*.go' -not -path './.git/*')
 VERSION        ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS        := -s -w -X main.version=$(VERSION)
@@ -15,15 +16,15 @@ help: ## Show this help.
 
 .PHONY: build
 build: ## Build the binary into ./$(BINARY).
-	go build -trimpath -ldflags "$(LDFLAGS)" -o $(BINARY) .
+	go build -trimpath -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/hello
 
 .PHONY: install
 install: ## Install the binary into $$GOBIN.
-	go install -trimpath -ldflags "$(LDFLAGS)" .
+	go install -trimpath -ldflags "$(LDFLAGS)" ./cmd/hello
 
 .PHONY: run
 run: ## Run with default animation.
-	go run . $(ARGS)
+	go run ./cmd/hello $(ARGS)
 
 .PHONY: test
 test: ## Run tests with race detector.
@@ -52,7 +53,7 @@ lint: ## Run golangci-lint (skipped with a warning if not installed).
 
 .PHONY: fuzz
 fuzz: ## Fuzz the animation parser for 30s.
-	go test -run '^$$' -fuzz=FuzzLoadFromBytes -fuzztime=30s $(PKG)
+	go test -run '^$$' -fuzz=FuzzLoadFromBytes -fuzztime=30s $(FUZZPKG)
 
 .PHONY: bench
 bench: ## Run benchmarks.
