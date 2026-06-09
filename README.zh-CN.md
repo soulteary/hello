@@ -6,6 +6,8 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/soulteary/hello)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+![Hello!](.github/assets/hello.jpg)
+
 `docker/hello-world` 的彩虹鹦鹉替代品。
 
 [English README](README.md)

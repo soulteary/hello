@@ -6,9 +6,11 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/soulteary/hello)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+![Hello!](.github/assets/hello.jpg)
+
 A drop-in replacement for `docker/hello-world`, but with a party parrot.
 
-[中文文档 / Chinese README](README.zh-CN.md)
+[中文文档](README.zh-CN.md)
 
 ## Usage
 
