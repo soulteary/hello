@@ -21,6 +21,9 @@ const (
 // sequences. It owns the frame and color cursors so that color cycling can
 // advance independently of frame advancement (callers decide when to call
 // AdvanceColor).
+//
+// A Renderer is not safe for concurrent use: all methods mutate the internal
+// cursors without synchronization, so a single goroutine must drive it.
 type Renderer struct {
 	out      io.Writer
 	mono     bool

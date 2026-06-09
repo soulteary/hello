@@ -34,9 +34,10 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
         -o /out/hello .
 
 # ---------- runtime stage ----------
-# `scratch` is empty: the final image contains exactly one file,
-# /hello. Animations are embedded inside the binary via `go:embed`.
-FROM scratch
+# distroless/static:nonroot is a tiny (~2 MB) base that ships CA certs, tzdata
+# and a non-root user (uid/gid 65532). The binary is fully static (CGO off),
+# so `static` is sufficient and the image runs unprivileged out of the box.
+FROM gcr.io/distroless/static-debian12:nonroot
 
 ARG VERSION=dev
 ARG REVISION=unknown
@@ -54,6 +55,10 @@ LABEL org.opencontainers.image.title="hello" \
       org.opencontainers.image.revision="${REVISION}" \
       org.opencontainers.image.created="${CREATED}"
 
-COPY --from=build /out/hello /hello
+COPY --from=build /out/hello /usr/local/bin/hello
 
-ENTRYPOINT ["/hello"]
+# distroless:nonroot already runs as 65532, but make it explicit.
+USER nonroot:nonroot
+STOPSIGNAL SIGTERM
+
+ENTRYPOINT ["/usr/local/bin/hello"]

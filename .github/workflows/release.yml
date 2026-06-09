@@ -1,0 +1,129 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache: true
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          bin="hello"
+          if [[ "${GOOS}" == "windows" ]]; then bin="hello.exe"; fi
+          mkdir -p dist
+          go build \
+            -trimpath \
+            -buildvcs=false \
+            -ldflags="-s -w -X main.version=${VERSION}" \
+            -o "dist/${bin}" .
+
+          stem="hello_${VERSION}_${GOOS}_${GOARCH}"
+          pushd dist >/dev/null
+          if [[ "${GOOS}" == "windows" ]]; then
+            zip "${stem}.zip" "${bin}"
+            sha256sum "${stem}.zip" > "${stem}.zip.sha256"
+          else
+            tar -czf "${stem}.tar.gz" "${bin}"
+            sha256sum "${stem}.tar.gz" > "${stem}.tar.gz.sha256"
+          fi
+          rm -f "${bin}"
+          popd >/dev/null
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Aggregate checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          cat *.sha256 > checksums.txt
+          rm -f *.sha256
+
+      - name: Extract changelog section
+        id: changelog
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          notes_file="$(mktemp)"
+          # Pull the section for this version out of CHANGELOG.md; fall back to
+          # a generic message if no matching header is found.
+          awk -v ver="${version}" '
+            $0 ~ "^## \\[" ver "\\]" {flag=1; next}
+            flag && /^## \[/ {flag=0}
+            flag {print}
+          ' CHANGELOG.md > "${notes_file}" || true
+          if [[ ! -s "${notes_file}" ]]; then
+            echo "Release ${GITHUB_REF_NAME}." > "${notes_file}"
+          fi
+          echo "path=${notes_file}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          body_path: ${{ steps.changelog.outputs.path }}
+          fail_on_unmatched_files: true

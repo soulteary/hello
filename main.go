@@ -52,11 +52,28 @@ func main() {
 		os.Exit(2)
 	}
 
+	// Guard against runaway frame delays (a typo like -delay 999999 would
+	// otherwise leave the user staring at a frozen frame for ~17 minutes).
+	const maxDelayMs = 60_000
+	if *delay > maxDelayMs {
+		fmt.Fprintf(os.Stderr, "delay must be <= %d ms\n", maxDelayMs)
+		os.Exit(2)
+	}
+
+	if *loops < 0 {
+		fmt.Fprintln(os.Stderr, "loops must be >= 0")
+		os.Exit(2)
+	}
+
 	inventory := NewInventory()
 
 	if *list {
 		for _, name := range availableAnimations(inventory) {
-			fmt.Println(name)
+			if desc := inventory[name].Metadata["description"]; desc != "" {
+				fmt.Printf("%s\t%s\n", name, desc)
+			} else {
+				fmt.Println(name)
+			}
 		}
 		return
 	}

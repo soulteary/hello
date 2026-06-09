@@ -42,6 +42,22 @@ cover-html: cover ## Open coverage report in the browser.
 vet: ## go vet the codebase.
 	go vet $(PKG)
 
+.PHONY: lint
+lint: ## Run golangci-lint (skipped with a warning if not installed).
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run; \
+	else \
+		echo "golangci-lint not found; skipping. Install: https://golangci-lint.run/welcome/install/"; \
+	fi
+
+.PHONY: fuzz
+fuzz: ## Fuzz the animation parser for 30s.
+	go test -run '^$$' -fuzz=FuzzLoadFromBytes -fuzztime=30s $(PKG)
+
+.PHONY: bench
+bench: ## Run benchmarks.
+	go test -run '^$$' -bench=. -benchmem $(PKG)
+
 .PHONY: fmt
 fmt: ## Format the codebase with gofmt.
 	gofmt -w $(GOFILES)
@@ -60,7 +76,7 @@ tidy: ## Run go mod tidy.
 	go mod tidy
 
 .PHONY: check
-check: fmt-check vet test ## Run fmt-check, vet and tests (CI-equivalent).
+check: fmt-check vet lint test ## Run fmt-check, vet, lint and tests (CI-equivalent).
 
 .PHONY: docker
 docker: ## Build a local Docker image for the host platform.

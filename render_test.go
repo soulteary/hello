@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"testing"
 )
@@ -108,5 +109,24 @@ func Test_Renderer_DrawEmptyAnimationIsNoop(t *testing.T) {
 	}
 	if r.FrameIndex() != 0 {
 		t.Errorf("expected frame index to remain 0, got %d", r.FrameIndex())
+	}
+}
+
+func BenchmarkRenderer_Draw(b *testing.B) {
+	anim := twoFrameAnim()
+	for _, mono := range []bool{true, false} {
+		name := "color"
+		if mono {
+			name = "mono"
+		}
+		b.Run(name, func(b *testing.B) {
+			r := NewRenderer(io.Discard, mono)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				r.Draw(anim)
+				r.AdvanceColor()
+			}
+		})
 	}
 }

@@ -8,11 +8,10 @@ import (
 
 func Test_NewInventory_HasParrotAndPedro(t *testing.T) {
 	inv := NewInventory()
-	if _, ok := inv["parrot"]; !ok {
-		t.Errorf("expected embedded inventory to contain 'parrot'")
-	}
-	if _, ok := inv["pedro"]; !ok {
-		t.Errorf("expected embedded inventory to contain 'pedro'")
+	for _, name := range []string{"parrot", "pedro", "cat", "coffee", "loading"} {
+		if _, ok := inv[name]; !ok {
+			t.Errorf("expected embedded inventory to contain %q", name)
+		}
 	}
 }
 
