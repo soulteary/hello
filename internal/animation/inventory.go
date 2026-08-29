@@ -2,6 +2,8 @@ package animation
 
 import (
 	"embed"
+	"errors"
+	"fmt"
 	"io/fs"
 	"strings"
 )
@@ -16,20 +18,31 @@ type Inventory map[string]Animation
 // LoadFromFS populates the inventory from any fs.FS rooted at a directory of
 // `*.animation` files. Files without the suffix are silently ignored.
 func (i Inventory) LoadFromFS(filesystem fs.FS) error {
-	files, err := fs.ReadDir(filesystem, ".")
-	if err != nil {
-		return err
+	if i == nil {
+		return errors.New("inventory is nil")
 	}
 
+	files, err := fs.ReadDir(filesystem, ".")
+	if err != nil {
+		return fmt.Errorf("read animation directory: %w", err)
+	}
+
+	// Parse into a temporary map first. A malformed file must not leave the
+	// caller with a partially updated inventory.
+	loaded := make(Inventory)
 	for _, file := range files {
 		if file.IsDir() || !strings.HasSuffix(file.Name(), ".animation") {
 			continue
 		}
 		animation, err := LoadFromFile(filesystem, file.Name())
 		if err != nil {
-			return err
+			return fmt.Errorf("load %s: %w", file.Name(), err)
 		}
-		i[strings.TrimSuffix(file.Name(), ".animation")] = *animation
+		loaded[strings.TrimSuffix(file.Name(), ".animation")] = *animation
+	}
+
+	for name, animation := range loaded {
+		i[name] = animation
 	}
 
 	return nil

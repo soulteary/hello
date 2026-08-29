@@ -1,13 +1,18 @@
 package e2e
 
 import (
+	"bufio"
+	"bytes"
 	"flag"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 // testBinary holds the path to a binary compiled once for the whole e2e suite.
@@ -117,5 +122,158 @@ func Test_CLI_NegativeLoopsExitsTwo(t *testing.T) {
 	out, code := runCLI(t, "-loops", "-1")
 	if code != 2 {
 		t.Fatalf("expected exit code 2 for negative loops, got %d (output: %s)", code, out)
+	}
+}
+
+func Test_CLI_RejectsExcessiveDelayAndExtraArguments(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping e2e test in -short mode")
+	}
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{args: []string{"-delay", "60001"}, want: "delay must be <= 60000 ms"},
+		{args: []string{"cat", "pedro"}, want: "at most one animation"},
+	} {
+		out, code := runCLI(t, tc.args...)
+		if code != 2 {
+			t.Errorf("args %v: exit code = %d, want 2; output: %s", tc.args, code, out)
+		}
+		if !strings.Contains(out, tc.want) {
+			t.Errorf("args %v: output does not contain %q: %s", tc.args, tc.want, out)
+		}
+	}
+}
+
+func Test_HTTP_ContentNegotiation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping e2e test in -short mode")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("signal-based HTTP shutdown is covered on Unix CI")
+	}
+	baseURL, stop := startHTTPServer(t)
+	defer stop()
+
+	req, err := http.NewRequest(http.MethodGet, baseURL+"/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("User-Agent", "curl/8.5.0")
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(response.Body)
+	if err := response.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(response.Header.Get("Content-Type"), "text/plain") {
+		t.Errorf("curl Content-Type = %q", response.Header.Get("Content-Type"))
+	}
+	if !bytes.Contains(body, []byte("Hello from soulteary/hello!")) || !bytes.Contains(body, []byte(".cccc")) {
+		t.Errorf("curl response is missing the parrot frame or diagnostics: %s", body)
+	}
+
+	req, err = http.NewRequest(http.MethodGet, baseURL+"/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Accept", "text/html")
+	response, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err = io.ReadAll(response.Body)
+	if err := response.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(response.Header.Get("Content-Type"), "text/html") || !bytes.Contains(body, []byte(`new EventSource(eventsURL)`)) {
+		t.Errorf("browser response is not the animated HTML page: %s", body)
+	}
+
+	response, err = http.Get(baseURL + "/healthz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	health, err := io.ReadAll(response.Body)
+	if err := response.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != http.StatusOK || string(health) != "ok\n" {
+		t.Errorf("health response = %d %q", response.StatusCode, health)
+	}
+}
+
+func startHTTPServer(t *testing.T) (string, func()) {
+	t.Helper()
+	cmd := exec.Command(testBinary, "-listen", "127.0.0.1:0")
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	lineCh := make(chan string, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		if scanner.Scan() {
+			lineCh <- scanner.Text()
+			return
+		}
+		if err := scanner.Err(); err != nil {
+			errCh <- err
+			return
+		}
+		errCh <- io.EOF
+	}()
+
+	var line string
+	select {
+	case line = <-lineCh:
+	case err := <-errCh:
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		t.Fatalf("read server address: %v; stderr: %s", err, stderr.String())
+	case <-time.After(5 * time.Second):
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		t.Fatalf("timed out waiting for HTTP server; stderr: %s", stderr.String())
+	}
+	const prefix = "hello HTTP server listening on "
+	if !strings.HasPrefix(line, prefix) {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		t.Fatalf("unexpected startup line %q; stderr: %s", line, stderr.String())
+	}
+	baseURL := "http://" + strings.TrimPrefix(line, prefix)
+
+	stopped := false
+	return baseURL, func() {
+		if stopped {
+			return
+		}
+		stopped = true
+		if err := cmd.Process.Signal(os.Interrupt); err != nil {
+			_ = cmd.Process.Kill()
+		}
+		if err := cmd.Wait(); err != nil {
+			t.Errorf("HTTP server did not stop cleanly: %v; stderr: %s", err, stderr.String())
+		}
 	}
 }

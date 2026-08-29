@@ -7,6 +7,7 @@ VERSION        ?= $(shell git describe --tags --always --dirty 2>/dev/null || ec
 LDFLAGS        := -s -w -X main.version=$(VERSION)
 DOCKER_IMAGE   ?= soulteary/hello
 DOCKER_TAG     ?= dev
+COVERAGE_MIN   ?= 90.0
 
 .DEFAULT_GOAL := help
 
@@ -31,9 +32,12 @@ test: ## Run tests with race detector.
 	go test -race -count=1 ./...
 
 .PHONY: cover
-cover: ## Run tests and produce coverage.out.
+cover: ## Run tests, produce coverage.out and enforce COVERAGE_MIN.
 	go test -race -count=1 -covermode=atomic -coverprofile=coverage.out $(PKG)
-	@go tool cover -func=coverage.out | tail -1
+	@total=$$(go tool cover -func=coverage.out | awk '/^total:/ {gsub(/%/, "", $$3); print $$3}'); \
+		echo "total coverage: $${total}% (minimum: $(COVERAGE_MIN)%)"; \
+		awk -v total="$${total}" -v minimum="$(COVERAGE_MIN)" 'BEGIN { exit !(total + 0 >= minimum + 0) }' || \
+			{ echo "coverage is below $(COVERAGE_MIN)%"; exit 1; }
 
 .PHONY: cover-html
 cover-html: cover ## Open coverage report in the browser.
@@ -44,12 +48,16 @@ vet: ## go vet the codebase.
 	go vet $(PKG)
 
 .PHONY: lint
-lint: ## Run golangci-lint (skipped with a warning if not installed).
-	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run; \
-	else \
-		echo "golangci-lint not found; skipping. Install: https://golangci-lint.run/welcome/install/"; \
-	fi
+lint: ## Run golangci-lint (required).
+	@command -v golangci-lint >/dev/null 2>&1 || \
+		{ echo "golangci-lint is required: https://golangci-lint.run/welcome/install/"; exit 1; }
+	golangci-lint run
+
+.PHONY: vuln
+vuln: ## Scan reachable Go code with govulncheck (required).
+	@command -v govulncheck >/dev/null 2>&1 || \
+		{ echo "govulncheck is required: go install golang.org/x/vuln/cmd/govulncheck@latest"; exit 1; }
+	govulncheck $(PKG)
 
 .PHONY: fuzz
 fuzz: ## Fuzz the animation parser for 30s.
@@ -76,8 +84,12 @@ fmt-check: ## Fail if any file is not gofmt-clean.
 tidy: ## Run go mod tidy.
 	go mod tidy
 
+.PHONY: tidy-check
+tidy-check: ## Fail if go.mod or go.sum needs tidying.
+	go mod tidy -diff
+
 .PHONY: check
-check: fmt-check vet lint test ## Run fmt-check, vet, lint and tests (CI-equivalent).
+check: tidy-check fmt-check vet lint vuln cover ## Run all required quality gates.
 
 .PHONY: docker
 docker: ## Build a local Docker image for the host platform.

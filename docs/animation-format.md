@@ -28,8 +28,8 @@ frames**, all separated by a line containing exactly `!--FRAME--!`:
 - At least two frames are required; a single-frame file is rejected because a
   static picture does not need the animation machinery.
 - Empty frames are rejected.
-- Both Unix (`\n`) and Windows (`\r\n`) line endings are supported, but a single
-  file must use one consistently.
+- Unix (`\n`), Windows (`\r\n`) and mixed LF/CRLF line endings are normalized
+  before parsing. Bare carriage returns (`\r`) are rejected.
 
 ### Metadata header
 
@@ -46,6 +46,10 @@ colon are ignored. Recommended keys:
 Only `description` is currently surfaced in the CLI (`-list`); the rest are
 documentation/attribution aids. When adding third-party artwork, also update
 [`NOTICE`](../NOTICE).
+
+The same inventory is used in HTTP mode. Selecting an animation with
+`hello -listen :8080 -animation coffee` changes both the plain-text first frame
+and the browser SSE stream.
 
 ### Minimal example
 
@@ -88,7 +92,8 @@ license: MIT
 - 之后每一段是一帧 ASCII 画面。
 - 至少需要两帧；只有一帧的文件会被拒绝，因为静态图片用不到动画机制。
 - 空帧会被拒绝。
-- 同时支持 Unix（`\n`）与 Windows（`\r\n`）换行，但单个文件需保持一致。
+- Unix（`\n`）、Windows（`\r\n`）以及混合 LF/CRLF 换行会在解析前统一处理；
+  单独出现的回车符（`\r`）会被拒绝。
 
 ### 元数据头
 
@@ -103,6 +108,9 @@ license: MIT
 
 目前只有 `description` 会在 CLI（`-list`）中展示，其余字段用于文档与署名。引入
 第三方素材时，请同时更新 [`NOTICE`](../NOTICE)。
+
+HTTP 模式使用同一份动画清单。例如
+`hello -listen :8080 -animation coffee` 会同时改变纯文本首帧和浏览器 SSE 动画流。
 
 ### 最小示例
 

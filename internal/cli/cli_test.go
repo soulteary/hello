@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,6 +29,81 @@ func Test_SelectAnimation(t *testing.T) {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func Test_ResolveAnimation(t *testing.T) {
+	tests := []struct {
+		flagValue string
+		args      []string
+		want      string
+	}{
+		{flagValue: "cat", args: []string{"pedro"}, want: "cat"},
+		{args: []string{"pedro"}, want: "pedro"},
+		{args: []string{""}, want: ""},
+		{want: ""},
+	}
+	for _, tc := range tests {
+		if got := ResolveAnimation(tc.flagValue, tc.args); got != tc.want {
+			t.Errorf("ResolveAnimation(%q, %v) = %q, want %q", tc.flagValue, tc.args, got, tc.want)
+		}
+	}
+}
+
+func Test_RunValidation(t *testing.T) {
+	tests := []struct {
+		name string
+		opts Options
+		want string
+		code int
+	}{
+		{name: "zero delay", opts: Options{Delay: 0}, want: "delay must be > 0", code: 2},
+		{name: "negative delay", opts: Options{Delay: -time.Millisecond}, want: "delay must be > 0", code: 2},
+		{name: "excessive delay", opts: Options{Delay: MaxFrameDelay + time.Millisecond}, want: "delay must be <=", code: 2},
+		{name: "negative loops", opts: Options{Delay: time.Millisecond, Loops: -1}, want: "loops must be >= 0", code: 2},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			tc.opts.Stdout = &stdout
+			tc.opts.Stderr = &stderr
+			if got := Run(tc.opts); got != tc.code {
+				t.Fatalf("exit code = %d, want %d", got, tc.code)
+			}
+			if !strings.Contains(stderr.String(), tc.want) {
+				t.Errorf("stderr does not contain %q: %s", tc.want, stderr.String())
+			}
+		})
+	}
+}
+
+func Test_RunListUnknownAndSuccess(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := Run(Options{List: true, Delay: time.Millisecond, Stdout: &stdout, Stderr: &stderr}); code != 0 {
+		t.Fatalf("list exit code = %d, want 0", code)
+	}
+	for _, want := range []string{"cat\tA bouncing cat", "parrot\tThe classic Party Parrot."} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Errorf("list output does not contain %q: %s", want, stdout.String())
+		}
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := Run(Options{Animation: "missing", Delay: time.Millisecond, Stdout: &stdout, Stderr: &stderr}); code != 1 {
+		t.Fatalf("unknown animation exit code = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "Available: [cat coffee loading parrot pedro]") {
+		t.Errorf("unknown-animation output is not stable: %s", stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := Run(Options{Loops: 1, Delay: time.Millisecond, Mono: true, Stdout: &stdout, Stderr: &stderr}); code != 0 {
+		t.Fatalf("default animation exit code = %d, want 0", code)
+	}
+	if !strings.Contains(stdout.String(), "\x1b[?25l") || !strings.Contains(stdout.String(), "\x1b[?25h") {
+		t.Errorf("successful run did not bracket output with cursor controls: %q", stdout.String())
 	}
 }
 

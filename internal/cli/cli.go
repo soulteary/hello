@@ -24,14 +24,20 @@ Examples:
   hello -mono -delay 120     # disable rainbow, slower frames
   hello -loops 3 pedro       # play pedro for 3 loops then exit
   hello -listen :8080        # serve HTTP instead of playing an animation
+  hello -listen :8080 -a cat # serve cat to curl and browsers
 `
 
 // defaultAnimation is played when no animation is requested.
 const defaultAnimation = "parrot"
 
-// Options bundles the resolved runtime configuration for Run. main is
-// responsible for parsing flags and validating ranges; Run consumes the
-// already-validated values and wires up the inventory, renderer and loop.
+// MaxFrameDelay protects callers of Run from accidentally creating a ticker
+// that appears frozen for minutes. The command-line and HTTP entry points use
+// the same upper bound.
+const MaxFrameDelay = 60 * time.Second
+
+// Options bundles the resolved runtime configuration for Run. main parses
+// command-line flags; Run validates programmatic callers before wiring up the
+// inventory, renderer and loop.
 type Options struct {
 	Animation string
 	Loops     int
@@ -52,6 +58,18 @@ func Run(opts Options) int {
 	}
 	if opts.Stderr == nil {
 		opts.Stderr = os.Stderr
+	}
+	if opts.Delay <= 0 {
+		fmt.Fprintln(opts.Stderr, "delay must be > 0")
+		return 2
+	}
+	if opts.Delay > MaxFrameDelay {
+		fmt.Fprintf(opts.Stderr, "delay must be <= %d ms\n", MaxFrameDelay/time.Millisecond)
+		return 2
+	}
+	if opts.Loops < 0 {
+		fmt.Fprintln(opts.Stderr, "loops must be >= 0")
+		return 2
 	}
 
 	inventory := animation.NewInventory()
@@ -174,27 +192,35 @@ func runLoop(renderer *render.Renderer, anim animation.Animation, opts loopOptio
 	ticker := time.NewTicker(opts.frameDelay)
 	defer ticker.Stop()
 
-	renderer.Draw(anim)
-	renderer.AdvanceColor()
-	drawn := 1
+	drawnInLoop := 0
+	remainingLoops := opts.loops
+	draw := func() bool {
+		renderer.Draw(anim)
+		renderer.AdvanceColor()
+		drawnInLoop++
+		if drawnInLoop < frames {
+			return false
+		}
+		drawnInLoop = 0
+		if remainingLoops > 0 {
+			remainingLoops--
+			return remainingLoops == 0
+		}
+		return false
+	}
 
-	// Total frames to draw before exiting; 0 means run forever.
-	target := 0
-	if opts.loops > 0 {
-		target = opts.loops * frames
+	if draw() {
+		return
 	}
 
 	for {
-		if target > 0 && drawn >= target {
-			return
-		}
 		select {
 		case <-opts.stop:
 			return
 		case <-ticker.C:
-			renderer.Draw(anim)
-			renderer.AdvanceColor()
-			drawn++
+			if draw() {
+				return
+			}
 		}
 	}
 }
