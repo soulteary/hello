@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
 # ---------- build stage ----------
-# Pin a Go version that matches go.mod's `go 1.26.4` directive.
-FROM --platform=$BUILDPLATFORM golang:1.26.4-alpine AS build
+# Pin a Go version that matches go.mod's `go 1.26.6` directive.
+FROM --platform=$BUILDPLATFORM golang:1.26.6-alpine AS build
 
 # TARGETOS/TARGETARCH are provided by buildx for multi-arch builds.
 ARG TARGETOS
@@ -22,7 +22,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 COPY . .
 
 # Static, stripped, reproducible single binary. CGO is disabled so the
-# resulting ELF has no glibc/musl dependency and runs on `scratch`.
+# resulting ELF has no glibc/musl dependency and runs in the distroless image.
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
@@ -43,7 +43,7 @@ ARG REVISION=unknown
 ARG CREATED
 
 LABEL org.opencontainers.image.title="hello" \
-      org.opencontainers.image.description="Drop-in replacement for hello-world, with a party parrot." \
+      org.opencontainers.image.description="A tiny terminal and HTTP demo with an animated ASCII parrot." \
       org.opencontainers.image.url="https://github.com/soulteary/hello" \
       org.opencontainers.image.source="https://github.com/soulteary/hello" \
       org.opencontainers.image.documentation="https://github.com/soulteary/hello#readme" \
@@ -55,6 +55,8 @@ LABEL org.opencontainers.image.title="hello" \
       org.opencontainers.image.created="${CREATED}"
 
 COPY --from=build /out/hello /usr/local/bin/hello
+COPY --from=build /src/LICENSE /usr/share/licenses/hello/LICENSE
+COPY --from=build /src/NOTICE /usr/share/licenses/hello/NOTICE
 
 # Optional HTTP mode listens on this unprivileged port when the container is
 # started with `-listen :8080`. The default remains the terminal animation.
