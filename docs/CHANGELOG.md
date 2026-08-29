@@ -28,9 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reachability-aware `govulncheck` gates in local development, pull requests
   and tagged releases.
 - Animation format reference, v2 migration guide and maintainer release guide.
-- Cross-platform binary releases for Linux, macOS and Windows on amd64/arm64,
-  with SHA-256 checksums.
-- Container SBOM/provenance attestations and keyless cosign signing.
 
 ### Changed
 
@@ -48,8 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ignores empty metadata keys and reports one-based empty-frame numbers.
 - Inventory loading is atomic and rejects a nil destination instead of
   panicking during map assignment.
-- The runtime container now uses `gcr.io/distroless/static-debian12:nonroot`
-  and runs as an explicit non-root user.
 - CI and release actions were upgraded and pinned to immutable commit SHAs;
   golangci-lint is now a required gate rather than an optional local warning.
 - Tagged releases run formatting, vet, lint, race tests and coverage checks

@@ -165,7 +165,7 @@ stderr 输出明确原因，并以非零状态码退出。
 go install github.com/soulteary/hello/cmd/hello@latest
 ```
 
-每个正式版本都包含 SHA-256 校验文件，以及以下预编译二进制：
+从 `v2.0.0` 开始，正式版本包含 SHA-256 校验文件，以及以下预编译二进制：
 
 - Linux：amd64、arm64
 - macOS：amd64、arm64

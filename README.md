@@ -171,7 +171,8 @@ Install from source with the Go version declared in [`go.mod`](go.mod):
 go install github.com/soulteary/hello/cmd/hello@latest
 ```
 
-Every tagged release includes SHA-256 checksums and binaries for:
+Starting with `v2.0.0`, tagged releases include SHA-256 checksums and binaries
+for:
 
 - Linux: amd64, arm64
 - macOS: amd64, arm64
