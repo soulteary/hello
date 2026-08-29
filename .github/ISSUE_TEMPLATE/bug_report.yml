@@ -41,6 +41,6 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: OS, terminal emulator, and how you ran it (Docker, go install, binary).
+      description: OS, terminal/browser or HTTP client, proxy (if any), and how you ran hello (Docker, go install, binary).
     validations:
       required: true

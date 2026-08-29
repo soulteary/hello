@@ -8,147 +8,231 @@
 
 ![Hello!](.github/assets/hello.jpg)
 
-`docker/hello-world` 的彩虹鹦鹉替代品。
+一个围绕经典 Party Parrot 构建的轻量终端动画与 HTTP 演示程序。它既可以
+作为 `docker/hello-world` 的有趣替代品，也适合用于容器、反向代理、鉴权网关和
+健康检查演示。
 
 [English README](README.md)
 
-## 使用方式
+## 快速开始
+
+运行终端动画：
 
 ```bash
-docker run --rm soulteary/hello
+docker run --rm -it soulteary/hello
 ```
 
-或从 GitHub Container Registry 拉取：
+默认动画会持续循环，按 `Ctrl+C` 退出。如果希望容器播放一次后自动退出：
 
 ```bash
-docker run --rm ghcr.io/soulteary/hello
+docker run --rm soulteary/hello -loops 1
 ```
 
-如需将镜像作为反向代理或鉴权网关后的轻量 HTTP 后端，请显式启用 HTTP
-模式：
+镜像同时发布到 Docker Hub 与 GitHub Container Registry：
+
+```bash
+docker run --rm -it soulteary/hello
+docker run --rm -it ghcr.io/soulteary/hello
+```
+
+## HTTP 模式
+
+显式启动内置 HTTP 服务：
 
 ```bash
 docker run --rm -p 8080:8080 ghcr.io/soulteary/hello -listen :8080
-curl http://127.0.0.1:8080/
-curl http://127.0.0.1:8080/healthz
 ```
 
-根路径响应会包含请求信息，并仅回显显式白名单中的非敏感路由/身份请求头
-（`X-Forwarded-User`、`X-Auth-User`、`X-Auth-Email`、`X-Auth-Role`、
-`X-Auth-Scopes`、标准 Forwarded 路由头和 `X-Real-IP`）；access token 请求头、
-`Authorization`、`Proxy-Authorization`、`Cookie` 等凭据不会被回显。
+根路径会根据请求自动选择响应形式：
 
-或使用 Go 直接安装二进制：
+- `curl` 和其他非浏览器客户端得到 `text/plain`：一帧原始 ASCII 图案，后面是
+  有助于排查代理链路且不包含凭据的请求摘要。
+- 浏览器得到终端风格 HTML 页面。页面连接 `/events` 并保留代理对外路径前缀，
+  服务端通过 Server-Sent Events（SSE）持续推送动画帧；JavaScript 在每帧到达后
+  刷新 `<pre>` 内容。
+- `?format=text` 和 `?format=html` 可覆盖自动判断；`plain` 是 `text` 的别名。
+
+分别测试文本和 HTML 响应：
+
+```bash
+curl http://127.0.0.1:8080/
+curl http://127.0.0.1:8080/healthz
+
+# 在非浏览器客户端中强制查看 HTML
+curl 'http://127.0.0.1:8080/?format=html'
+```
+
+然后用浏览器打开 <http://127.0.0.1:8080/>，即可看到自动刷新的终端鹦鹉。
+如果 JavaScript 被关闭或浏览器不支持 SSE，页面仍会显示内嵌的第一帧。
+
+### HTTP 端点
+
+| 端点 | 方法 | 响应 |
+| --- | --- | --- |
+| `/` | `GET`、`HEAD` | 自动协商的文本帧或 HTML 终端。 |
+| `/events` | `GET`、`HEAD` | 浏览器页面使用的 SSE 动画流。 |
+| `/healthz` | `GET`、`HEAD` | `200 OK` 与 `ok`。 |
+
+`/events` 中的事件名是 `frame`，数据为 JSON：
+
+```text
+event: frame
+data: {"animation":"parrot","color":"#ff8787","frame":"...","index":0}
+```
+
+这里的 SSE 是建立在普通长连接 HTTP 响应之上的应用层 Server Push。项目没有
+采用 HTTP/2 Resource Push，因为现代浏览器已经不再将它作为通用页面资源推送
+机制支持。
+
+### HTTP 选项
+
+终端参数会在含义合理时复用于 HTTP 模式：
+
+```bash
+# 以 120 ms 帧间隔展示 cat，并关闭彩色循环
+docker run --rm -p 8080:8080 ghcr.io/soulteary/hello \
+  -listen :8080 -animation cat -delay 120 -mono
+```
+
+- `-animation` / `-a` 同时决定 curl 首帧和浏览器动画。
+- `-delay` 决定 SSE 推送帧间隔。
+- `-mono` 关闭浏览器颜色循环。
+- `-loops`、`-list` 不能与 `-listen` 组合使用。
+
+服务设置了请求和请求头超时，并支持 `SIGINT` / `SIGTERM` 优雅退出。SSE 每次
+写入使用独立截止时间，因此不会被较短的全局响应超时误切断。若 `/events` 前方
+存在反向代理，需要为该路径关闭响应缓冲；hello 同时会发送兼容代理可识别的
+`X-Accel-Buffering: no`。
+
+### 请求信息回显范围
+
+文本响应包含方法、URL、Host、容器主机名和版本，仅回显以下明确允许的路由或
+身份请求头：
+
+- `Forwarded`、`User-Agent`、`X-Real-IP`
+- `X-Forwarded-For`、`X-Forwarded-Host`、`X-Forwarded-Method`、
+  `X-Forwarded-Port`、`X-Forwarded-Prefix`、`X-Forwarded-Proto`、
+  `X-Forwarded-URI`、`X-Forwarded-User`
+- `X-Auth-Email`、`X-Auth-Groups`、`X-Auth-Name`、`X-Auth-Role`、
+  `X-Auth-Scopes`、`X-Auth-User`
+
+凭据类或未识别的请求头不会回显，包括 `Authorization`、
+`Proxy-Authorization`、`Cookie`、`X-Auth-Token` 和
+`X-Forwarded-Access-Token`。
+
+## 内置动画
+
+| 名称 | 描述 |
+| --- | --- |
+| `parrot` | 经典 Party Parrot。 |
+| `cat` | 蹦跶的小猫。 |
+| `coffee` | 一杯冒着热气的咖啡。 |
+| `loading` | 简易加载转圈。 |
+| `pedro` | 浣熊 Pedro。 |
+
+动画名可作为位置参数，也可通过 `-a` / `-animation` 传入：
+
+```bash
+docker run --rm -it soulteary/hello cat
+docker run --rm -it soulteary/hello -a coffee
+docker run --rm soulteary/hello -list
+```
+
+新增动画或了解元数据、分帧规则，请阅读
+[动画格式说明](docs/animation-format.md)。
+
+## 命令行参数
+
+| 参数 | 描述 | 默认值 |
+| --- | --- | --- |
+| `-a`、`-animation` | 动画名；优先于位置参数。 | `""` |
+| `-loops` | 终端循环次数；`0` 表示无限。 | `0` |
+| `-delay` | 帧间隔（毫秒）；范围 `1`–`60000`。 | `75` |
+| `-mono` | 关闭彩虹色。 | `false` |
+| `-list` | 列出内置动画并退出。 | `false` |
+| `-listen` | 监听 HTTP，而不是进入终端播放循环。 | `""` |
+| `-version` | 打印构建版本并退出。 | `false` |
+| `-h`、`-help` | 打印使用说明并退出。 | `false` |
+
+最多接受一个位置动画参数。动画名不存在、参数越界或参数组合冲突时，程序会向
+stderr 输出明确原因，并以非零状态码退出。
+
+## 安装二进制
+
+使用 [`go.mod`](go.mod) 声明的 Go 版本从源码安装：
 
 ```bash
 go install github.com/soulteary/hello@latest
 ```
 
-Linux、macOS、Windows（amd64/arm64）的预编译二进制可在每个
-[GitHub Release](https://github.com/soulteary/hello/releases) 中下载。
+每个正式版本都包含 SHA-256 校验文件，以及以下预编译二进制：
 
-示例：
+- Linux：amd64、arm64
+- macOS：amd64、arm64
+- Windows：amd64、arm64
 
-```bash
-# 默认：经典 Party Parrot，无限循环
-docker run --rm soulteary/hello
+发布压缩包会同时包含 `LICENSE` 和 `NOTICE`。容器镜像使用非 root 用户运行在
+distroless 基础镜像中，并在 `/usr/share/licenses/hello/` 保留相同文件。
 
-# 跑 3 圈后退出
-docker run --rm soulteary/hello -loops 3
+## 终端兼容性
 
-# 切换动画并关闭彩虹色
-docker run --rm soulteary/hello -mono cat
-```
+终端动画依赖 ANSI 光标控制与 256 色转义序列。如果终端不支持，请使用
+`-mono`；也可增加 `-loops 1`，避免无法正确显示的动画无限运行。
 
-## 内置动画
-
-| 名称      | 描述                |
-| --------- | ------------------- |
-| `parrot`  | 经典 Party Parrot。 |
-| `cat`     | 蹦跶的小猫。        |
-| `coffee`  | 一杯冒着热气的咖啡。|
-| `loading` | 简易加载转圈。      |
-| `pedro`   | 浣熊 Pedro。        |
-
-动画名作为位置参数传入，例如
-`docker run --rm soulteary/hello cat`。不传则默认 `parrot`。
-
-若想了解或新增动画，`*.animation` 文件格式见
-[`docs/animation-format.md`](docs/animation-format.md)。
-
-列出内置动画（每个名字后会显示 `description` 元数据）：
-
-```bash
-$ docker run --rm soulteary/hello -list
-cat     A bouncing cat
-coffee  A steaming cup of coffee
-loading A simple loading spinner
-parrot  The classic Party Parrot.
-pedro   Pedro the raccoon
-```
-
-## 参数
-
-| 参数         | 描述                                  | 默认值  |
-| ------------ | ------------------------------------- | ------- |
-| `-a`, `-animation` | 动画名（覆盖位置参数）。        | `""`    |
-| `-loops`     | 循环次数，`0` 表示无限。              | `0`     |
-| `-delay`     | 帧间隔（毫秒，必须 > 0）。            | `75`    |
-| `-mono`      | 关闭彩虹色，输出单色。                | `false` |
-| `-list`      | 列出所有内置动画并退出。              | `false` |
-| `-listen`    | 监听指定地址提供 HTTP 服务，不播放动画。 | `""` |
-| `-version`   | 打印版本并退出。                      | `false` |
-| `-h`, `-help` | 打印用法并退出。                     | `false` |
-
-## 注意事项
-
-输出依赖 ANSI 转义序列。如果你的终端不支持，画面会错乱 —— 这种情况下建议加上
-`-loops 1`，让它跑完一轮就退出，而不是无限循环。
-
-在 Windows 上请使用 [Windows Terminal](https://aka.ms/terminal) 或较新的
-PowerShell；旧版 `cmd.exe` 控制台可能无法正确渲染 256 色序列。
+Windows 建议使用 Windows Terminal 或较新的 PowerShell。旧版 `cmd.exe`
+可能无法正确渲染颜色和光标控制序列。
 
 ## 开发
 
-本项目是一个单文件 Go 模块，无第三方依赖。
+项目是一个无第三方运行时依赖的 Go 模块，按职责拆分为以下内部包：
+
+| 路径 | 职责 |
+| --- | --- |
+| `cmd/hello` | 参数解析，以及终端 / HTTP 模式分发。 |
+| `internal/animation` | 内嵌动画清单与格式解析。 |
+| `internal/render` | ANSI 终端渲染。 |
+| `internal/cli` | 终端播放循环与信号处理。 |
+| `internal/httpserver` | 内容协商、HTML、SSE 与健康检查。 |
+
+常用命令：
 
 ```bash
-make help         # 列出所有可用目标
-make build        # 构建 ./hello 二进制
-make test         # 带 -race 的测试
-make cover        # 测试并打印覆盖率
-make check        # gofmt + vet + test（与 CI 一致）
-make docker       # 本地构建 Docker 镜像
+make help          # 查看所有目标
+make build         # 构建带版本信息的 ./hello
+make test          # 使用 race detector 运行全部测试
+make cover         # 运行测试并执行 90% 语句覆盖率门槛
+make lint          # 运行必需的 golangci-lint
+make vuln          # 使用 govulncheck 扫描可达代码
+make check         # 运行全部必需的本地质量门槛（含模块整洁性）
+make fuzz          # 对动画解析器模糊测试 30 秒
+make bench         # 运行渲染器基准测试
+make docker        # 构建本地容器镜像
 ```
 
-CI 会在每次 push / PR 时运行 `go vet`、`gofmt -l`、`go test -race`
-（`.github/workflows/test.yml`）。Docker 镜像会从 `main` 分支与 `v*` tag
-触发构建并发布（`.github/workflows/docker.yml`）。
+需要验证更高覆盖率目标时，可覆盖默认门槛：
 
-## 致谢
+```bash
+make cover COVERAGE_MIN=95
+```
 
-本项目基于
-[jmhobbs/hello-parrot](https://github.com/jmhobbs/hello-parrot)（作者
-[John Hobbs](https://github.com/jmhobbs)，2016 年）深度重构而来。
+CI 会检查模块整洁性、格式、`go vet`、govulncheck、golangci-lint、竞态测试和
+覆盖率门槛；CodeQL 在 push、PR 和每周定时任务中执行。第三方 GitHub Actions
+均固定到完整 Commit SHA。
 
-感谢原作者带来的彩虹鹦鹉。当前版本在此基础上新增了 Docker 打包、更多动画、
-可扩展的动画加载机制、命令行参数与完整的测试套件。
+贡献流程见 [CONTRIBUTING.md](.github/CONTRIBUTING.md)，私密安全问题报告方式见
+[SECURITY.md](.github/SECURITY.md)，HTTP 兼容性变化见
+[v2 迁移指南](docs/migration-v2.md)。维护者在创建 `v2.0.0` 或后续版本标签前，
+应执行[发布指南](docs/releasing.md)。
 
-## 参与贡献与安全
+## 致谢与许可证
 
-欢迎贡献 —— 开发流程与新增动画的检查清单见
-[`CONTRIBUTING.md`](.github/CONTRIBUTING.md)。报告安全问题请参考
-[`SECURITY.md`](.github/SECURITY.md)。所有参与者都应遵守
-[行为准则](.github/CODE_OF_CONDUCT.md)。
+项目基于 [John Hobbs](https://github.com/jmhobbs) 在 2016 年发布的
+[jmhobbs/terminal-parrot](https://github.com/jmhobbs/terminal-parrot) 深度重构。
 
-## 许可证
-
-基于 [MIT 许可证](LICENSE) 发布。
+项目使用 [MIT 许可证](LICENSE)：
 
 - Copyright (c) 2016 John Hobbs —— 原始作品
 - Copyright (c) 2026 soulteary —— 后续修改与新增内容
 
-再次分发本项目时（包括二进制与 Docker 镜像），请同时保留 `LICENSE` 和
-`NOTICE` 文件，以确保所有版权与署名信息都得到完整传递 —— 这是 MIT 许可证
-的硬性要求。完整的署名清单（含 `internal/animation/assets/animations/` 下第三方 ASCII 素材）见
-[`NOTICE`](NOTICE)。
+再次分发源码、发布压缩包或容器镜像时，必须保留 `LICENSE` 和 `NOTICE`。
+内置 ASCII 素材的完整署名见 [`NOTICE`](NOTICE)。

@@ -8,154 +8,244 @@
 
 ![Hello!](.github/assets/hello.jpg)
 
-A drop-in replacement for `docker/hello-world`, but with a party parrot.
+A tiny terminal animation and HTTP demo, built around the classic Party
+Parrot. It is a playful alternative to `docker/hello-world` and a useful
+backend for container, reverse-proxy, authentication-gateway and health-check
+demos.
 
 [中文文档](README.zh-CN.md)
 
-## Usage
+## Quick start
+
+Run the terminal animation:
 
 ```bash
-docker run --rm soulteary/hello
+docker run --rm -it soulteary/hello
 ```
 
-Or pull from GitHub Container Registry:
+The default animation loops until you press `Ctrl+C`. Use `-loops 1` when you
+want a one-shot container:
 
 ```bash
-docker run --rm ghcr.io/soulteary/hello
+docker run --rm soulteary/hello -loops 1
 ```
 
-To use the image as a tiny HTTP backend (for example, behind a reverse proxy
-or authentication gateway), enable HTTP mode explicitly:
+Images are published to both Docker Hub and GitHub Container Registry:
+
+```bash
+docker run --rm -it soulteary/hello
+docker run --rm -it ghcr.io/soulteary/hello
+```
+
+## HTTP mode
+
+Start the built-in server explicitly:
 
 ```bash
 docker run --rm -p 8080:8080 ghcr.io/soulteary/hello -listen :8080
-curl http://127.0.0.1:8080/
-curl http://127.0.0.1:8080/healthz
 ```
 
-The root response includes request metadata and an explicit allowlist of
-non-sensitive routing/identity headers (`X-Forwarded-User`, `X-Auth-User`,
-`X-Auth-Email`, `X-Auth-Role`, `X-Auth-Scopes`, standard forwarded routing
-headers, and `X-Real-IP`). It deliberately does not reflect credentials such
-as access-token headers, `Authorization`, `Proxy-Authorization`, or `Cookie`.
+The root endpoint negotiates its representation from the request:
 
-Or install the binary directly with Go:
+- `curl` and other non-browser clients receive `text/plain`: one raw ASCII
+  frame followed by useful, non-sensitive request diagnostics.
+- Browsers receive a terminal-style HTML page. The page opens `/events` while
+  preserving an external proxy path prefix, and the server continuously pushes
+  animation frames using Server-Sent Events (SSE). JavaScript replaces the
+  `<pre>` contents as each frame arrives.
+- `?format=text` and `?format=html` override automatic detection. `plain` is an
+  alias for `text`.
+
+Try both representations:
+
+```bash
+curl http://127.0.0.1:8080/
+curl http://127.0.0.1:8080/healthz
+
+# Force HTML for inspection from a non-browser client
+curl 'http://127.0.0.1:8080/?format=html'
+```
+
+Then open <http://127.0.0.1:8080/> in a browser to see the animated terminal.
+If JavaScript or SSE is unavailable, the page still displays its embedded
+first frame.
+
+### HTTP endpoints
+
+| Endpoint | Methods | Response |
+| --- | --- | --- |
+| `/` | `GET`, `HEAD` | Content-negotiated text frame or HTML terminal. |
+| `/events` | `GET`, `HEAD` | SSE stream used by the browser page. |
+| `/healthz` | `GET`, `HEAD` | `200 OK` with `ok`. |
+
+Each `/events` message is named `frame` and contains JSON:
+
+```text
+event: frame
+data: {"animation":"parrot","color":"#ff8787","frame":"...","index":0}
+```
+
+SSE is application-level server push over a normal long-lived HTTP response.
+It is intentionally used instead of HTTP/2 resource push, which modern
+browsers no longer support as a general page-delivery mechanism.
+
+### HTTP options
+
+Terminal flags are reused where they make sense:
+
+```bash
+# Serve the cat animation at 120 ms per frame, without rainbow colors
+docker run --rm -p 8080:8080 ghcr.io/soulteary/hello \
+  -listen :8080 -animation cat -delay 120 -mono
+```
+
+- `-animation` / `-a` selects the terminal frame and browser stream.
+- `-delay` controls the SSE frame interval.
+- `-mono` disables browser color cycling.
+- `-loops` and `-list` cannot be combined with `-listen`.
+
+The server has bounded request/header timeouts and graceful `SIGINT`/`SIGTERM`
+shutdown. Streaming writes receive their own deadlines so an SSE connection is
+not cut off by a short global response timeout. When a reverse proxy sits in
+front of `/events`, disable response buffering for that route; hello also emits
+`X-Accel-Buffering: no` for compatible proxies.
+
+### Reflected request information
+
+The plain-text response includes method, URL, host, hostname and version. It
+reflects only this explicit allowlist of common routing/identity headers:
+
+- `Forwarded`, `User-Agent`, `X-Real-IP`
+- `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Method`,
+  `X-Forwarded-Port`, `X-Forwarded-Prefix`, `X-Forwarded-Proto`,
+  `X-Forwarded-URI`, `X-Forwarded-User`
+- `X-Auth-Email`, `X-Auth-Groups`, `X-Auth-Name`, `X-Auth-Role`,
+  `X-Auth-Scopes`, `X-Auth-User`
+
+Credential-bearing or unrecognized headers are never reflected. This includes
+`Authorization`, `Proxy-Authorization`, `Cookie`, `X-Auth-Token` and
+`X-Forwarded-Access-Token`.
+
+## Animations
+
+| Name | Description |
+| --- | --- |
+| `parrot` | The classic Party Parrot. |
+| `cat` | A bouncing cat. |
+| `coffee` | A steaming cup of coffee. |
+| `loading` | A simple loading spinner. |
+| `pedro` | Pedro the raccoon. |
+
+Pass the animation as a positional argument or with `-a` / `-animation`:
+
+```bash
+docker run --rm -it soulteary/hello cat
+docker run --rm -it soulteary/hello -a coffee
+docker run --rm soulteary/hello -list
+```
+
+See [the animation format reference](docs/animation-format.md) to add an
+animation or understand its metadata and frame separators.
+
+## Command-line reference
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `-a`, `-animation` | Animation name; overrides the positional argument. | `""` |
+| `-loops` | Number of terminal loops; `0` means infinite. | `0` |
+| `-delay` | Frame interval in milliseconds; range `1`–`60000`. | `75` |
+| `-mono` | Disable rainbow colors. | `false` |
+| `-list` | List embedded animations and exit. | `false` |
+| `-listen` | Listen for HTTP requests instead of running the terminal loop. | `""` |
+| `-version` | Print the build version and exit. | `false` |
+| `-h`, `-help` | Print usage and exit. | `false` |
+
+Only one positional animation name is accepted. Unknown animations and invalid
+flag combinations fail with a non-zero exit code and a diagnostic on stderr.
+
+## Install a binary
+
+Install from source with the Go version declared in [`go.mod`](go.mod):
 
 ```bash
 go install github.com/soulteary/hello@latest
 ```
 
-Pre-built binaries for Linux, macOS and Windows (amd64/arm64) are attached to
-each [GitHub Release](https://github.com/soulteary/hello/releases).
+Every tagged release includes SHA-256 checksums and binaries for:
 
-Examples:
+- Linux: amd64, arm64
+- macOS: amd64, arm64
+- Windows: amd64, arm64
 
-```bash
-# Default: the classic Party Parrot, looping forever
-docker run --rm soulteary/hello
+Release archives also include `LICENSE` and `NOTICE`. Container images run as a
+non-root user on a distroless base and carry the same files under
+`/usr/share/licenses/hello/`.
 
-# Run the parrot for exactly 3 loops, then exit
-docker run --rm soulteary/hello -loops 3
+## Terminal compatibility
 
-# Pick a different animation and disable rainbow colors
-docker run --rm soulteary/hello -mono cat
-```
+Terminal animation uses ANSI cursor and 256-color escape sequences. If your
+terminal does not support them, use `-mono`; use `-loops 1` to avoid leaving an
+unusable infinite animation running.
 
-## Animations
-
-| Name      | Description                       |
-| --------- | --------------------------------- |
-| `parrot`  | The classic Party Parrot.         |
-| `cat`     | A bouncing cat.                   |
-| `coffee`  | A steaming cup of coffee.         |
-| `loading` | A simple loading spinner.         |
-| `pedro`   | Pedro the raccoon.                |
-
-The animation name is passed as a positional argument, e.g.
-`docker run --rm soulteary/hello cat`. If omitted, `parrot` is used.
-
-See [`docs/animation-format.md`](docs/animation-format.md) for the
-`*.animation` file format if you want to understand or add animations.
-
-List the bundled animations (the `description` metadata is shown alongside each
-name):
-
-```bash
-$ docker run --rm soulteary/hello -list
-cat     A bouncing cat
-coffee  A steaming cup of coffee
-loading A simple loading spinner
-parrot  The classic Party Parrot.
-pedro   Pedro the raccoon
-```
-
-## Flags
-
-| Flag         | Description                              | Default |
-| ------------ | ---------------------------------------- | ------- |
-| `-a`, `-animation` | Animation name (overrides positional). | `""`    |
-| `-loops`     | Number of loops, `0` for infinite.       | `0`     |
-| `-delay`     | Frame delay in milliseconds (must be > 0). | `75`  |
-| `-mono`      | Disable rainbow colors.                  | `false` |
-| `-list`      | List all available animations and exit.  | `false` |
-| `-listen`    | Serve HTTP on an address instead of playing an animation. | `""` |
-| `-version`   | Print version and exit.                  | `false` |
-| `-h`, `-help` | Print usage and exit.                   | `false` |
-
-## Notes
-
-The output relies on ANSI escape sequences. If your terminal does not support
-them, the animation will look garbled — consider running with `-loops 1` so it
-exits quickly instead of looping forever.
-
-On Windows, use [Windows Terminal](https://aka.ms/terminal) or a recent
-PowerShell; the legacy `cmd.exe` console may not render the 256-color sequences
-correctly.
+On Windows, prefer Windows Terminal or a recent PowerShell. Legacy `cmd.exe`
+may not render the colors or cursor controls correctly.
 
 ## Development
 
-This project is a single-file Go module with no third-party dependencies.
+The project is a dependency-free Go module organized into small internal
+packages:
+
+| Path | Responsibility |
+| --- | --- |
+| `cmd/hello` | Flag parsing and terminal/HTTP dispatch. |
+| `internal/animation` | Embedded inventory and animation parser. |
+| `internal/render` | ANSI terminal renderer. |
+| `internal/cli` | Terminal playback loop and signal handling. |
+| `internal/httpserver` | Content negotiation, HTML page, SSE and health checks. |
+
+Common commands:
 
 ```bash
-make help         # list all available targets
-make build        # build the ./hello binary
-make test         # run tests with -race
-make cover        # run tests and print coverage summary
-make check        # gofmt + vet + tests (CI-equivalent)
-make docker       # build a local Docker image
+make help          # list targets
+make build         # build ./hello with version metadata
+make test          # run all tests with the race detector
+make cover         # run tests and enforce the 90% statement-coverage floor
+make lint          # run required golangci-lint checks
+make vuln          # scan reachable code with govulncheck
+make check         # run every required local quality gate, including tidy
+make fuzz          # fuzz the animation parser for 30 seconds
+make bench         # run renderer benchmarks
+make docker        # build a local container image
 ```
 
-CI runs `go vet`, `gofmt -l`, `go test -race` on every push and PR
-(`.github/workflows/test.yml`). The Docker image is built and published from
-`main` and from `v*` tags (`.github/workflows/docker.yml`).
+Override the coverage floor when deliberately testing a stricter target:
 
-## Credits
+```bash
+make cover COVERAGE_MIN=95
+```
+
+CI verifies module tidiness, formatting, `go vet`, govulncheck,
+golangci-lint, race tests and the coverage floor. CodeQL runs on pushes, pull
+requests and a weekly schedule. Third-party GitHub Actions are pinned to full
+commit SHAs.
+
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for the contribution workflow,
+[SECURITY.md](.github/SECURITY.md) for private vulnerability reporting, and
+[the v2 migration guide](docs/migration-v2.md) for HTTP compatibility details.
+Maintainers should follow [the release guide](docs/releasing.md) before tagging
+`v2.0.0` or a later release.
+
+## Credits and license
 
 This project is a heavily refactored fork of
-[jmhobbs/hello-parrot](https://github.com/jmhobbs/hello-parrot) by
+[jmhobbs/terminal-parrot](https://github.com/jmhobbs/terminal-parrot) by
 [John Hobbs](https://github.com/jmhobbs), originally released in 2016.
 
-Thanks to the original author for the lovely party parrot. The current
-distribution adds Docker packaging, additional animations, a pluggable
-animation loader, configuration flags, and a full test suite.
-
-## Contributing & Security
-
-Contributions are welcome — see [`CONTRIBUTING.md`](.github/CONTRIBUTING.md) for
-the development workflow and the checklist for adding new animations. To report
-a security issue, please follow [`SECURITY.md`](.github/SECURITY.md). All
-participants are expected to follow the
-[Code of Conduct](.github/CODE_OF_CONDUCT.md).
-
-## License
-
-Released under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE):
 
 - Copyright (c) 2016 John Hobbs — original work
 - Copyright (c) 2026 soulteary — modifications and additions
 
-When redistributing this project (including binaries and Docker images), the
-`LICENSE` and `NOTICE` files must be included so that all copyright notices
-and attribution are preserved, as required by the MIT License. See
-[`NOTICE`](NOTICE) for the full attribution list, including third-party
-ASCII assets shipped under `internal/animation/assets/animations/`.
+Redistributions, including release archives and container images, must retain
+`LICENSE` and `NOTICE`. The complete attribution list for bundled ASCII assets
+is in [`NOTICE`](NOTICE).

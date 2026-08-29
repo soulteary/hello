@@ -3,9 +3,9 @@ hello
 
 This product includes software originally developed by:
 
-  * John Hobbs (https://github.com/jmhobbs) — original "hello-parrot" project
+  * John Hobbs (https://github.com/jmhobbs) — original "terminal-parrot" project
     released in 2016 under the MIT License.
-    Upstream: https://github.com/jmhobbs/hello-parrot
+    Upstream: https://github.com/jmhobbs/terminal-parrot
 
 Modifications and additions in this distribution are:
 
@@ -25,12 +25,13 @@ artwork originates from a known upstream, attribution is given here:
 
   * internal/animation/assets/animations/parrot.animation
       The "Party Parrot" ASCII rendition originates from
-      jmhobbs/hello-parrot (MIT, 2016).
+      jmhobbs/terminal-parrot (MIT, 2016).
 
   * internal/animation/assets/animations/pedro.animation
-      Pedro the raccoon, an internet meme rendered as ASCII art.
-      No exclusive authorship is claimed by this project; it is included
-      as a community asset.
+      Pedro the raccoon ASCII animation was contributed by GitHub user
+      j0rdan0 to the MIT-licensed jmhobbs/terminal-parrot project in pull
+      request #25:
+      https://github.com/jmhobbs/terminal-parrot/pull/25
 
   * internal/animation/assets/animations/cat.animation
     internal/animation/assets/animations/coffee.animation
