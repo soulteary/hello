@@ -62,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- SSE capability detection now follows middleware `Unwrap` chains instead of
+  rejecting a compatible wrapped response writer.
 - The documented `go install` path now targets `cmd/hello`, where the main
   package lives in the modern project layout.
 - Release archives now include `LICENSE` and `NOTICE`; container images retain

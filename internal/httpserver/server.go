@@ -257,12 +257,6 @@ func (h handler) events(w http.ResponseWriter, r *http.Request) {
 		methodNotAllowed(w)
 		return
 	}
-	if r.Method == http.MethodGet {
-		if _, ok := w.(http.Flusher); !ok {
-			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
-			return
-		}
-	}
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store, no-transform")
 	w.Header().Set("X-Accel-Buffering", "no")
@@ -278,14 +272,22 @@ func (h handler) events(w http.ResponseWriter, r *http.Request) {
 		}
 		return err
 	}
-	flush := func() error {
-		err := controller.Flush()
-		if errors.Is(err, http.ErrNotSupported) {
-			return nil
-		}
-		return err
+	if err := prepare(); err != nil {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.Error(w, "streaming unavailable", http.StatusInternalServerError)
+		return
 	}
-	_ = streamAnimation(r.Context(), w, prepare, flush, h.name, h.animation, h.frameDelay, h.mono)
+	// ResponseController follows Unwrap methods exposed by middleware. Probe
+	// through it rather than requiring the outermost writer to implement
+	// http.Flusher directly.
+	if err := controller.Flush(); err != nil {
+		if errors.Is(err, http.ErrNotSupported) {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		}
+		return
+	}
+	_ = streamAnimation(r.Context(), w, prepare, controller.Flush, h.name, h.animation, h.frameDelay, h.mono)
 }
 
 func setResponseHeaders(w http.ResponseWriter) {

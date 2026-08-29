@@ -487,6 +487,24 @@ func TestEventsRejectsNonFlushingWriter(t *testing.T) {
 	}
 }
 
+func TestEventsStreamsThroughUnwrapCapableWriter(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	underlying := &cancelOnFlushWriter{
+		ResponseRecorder: httptest.NewRecorder(),
+		cancel:           cancel,
+	}
+	writer := unwrapResponseWriter{ResponseWriter: underlying}
+	req := httptest.NewRequest(http.MethodGet, "http://hello.example/events", nil).WithContext(ctx)
+
+	newSmallHandler(t, HandlerOptions{}).ServeHTTP(writer, req)
+	if underlying.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body: %s", underlying.Code, underlying.Body.String())
+	}
+	if got := underlying.Header().Get("Content-Type"); !strings.HasPrefix(got, "text/event-stream") {
+		t.Errorf("Content-Type = %q, want text/event-stream", got)
+	}
+}
+
 func TestWriteTextResponseNewlineHandling(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://hello.example/", nil)
 	for _, frame := range [][]byte{nil, []byte("A"), []byte("A\n")} {
@@ -599,6 +617,24 @@ type basicResponseWriter struct {
 type readyWriter struct {
 	once sync.Once
 	line chan string
+}
+
+type unwrapResponseWriter struct {
+	http.ResponseWriter
+}
+
+func (w unwrapResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
+type cancelOnFlushWriter struct {
+	*httptest.ResponseRecorder
+	cancel context.CancelFunc
+}
+
+func (w *cancelOnFlushWriter) Flush() {
+	w.ResponseRecorder.Flush()
+	w.cancel()
 }
 
 func (w *readyWriter) Write(p []byte) (int, error) {
