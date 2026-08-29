@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Optional `-listen` HTTP mode with `/healthz` and safe reverse-proxy header
+  reflection, allowing the image to act as a small protected-service backend.
 - Documentation for the `*.animation` file format (`docs/animation-format.md`).
 - `-loops` negative-value validation and an upper bound check for `-delay`.
 - `-list` now prints the animation `description` metadata next to each name.

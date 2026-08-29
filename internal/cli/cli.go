@@ -23,6 +23,7 @@ Examples:
   hello -list                # list all available animations
   hello -mono -delay 120     # disable rainbow, slower frames
   hello -loops 3 pedro       # play pedro for 3 loops then exit
+  hello -listen :8080        # serve HTTP instead of playing an animation
 `
 
 // defaultAnimation is played when no animation is requested.

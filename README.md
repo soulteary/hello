@@ -24,6 +24,20 @@ Or pull from GitHub Container Registry:
 docker run --rm ghcr.io/soulteary/hello
 ```
 
+To use the image as a tiny HTTP backend (for example, behind a reverse proxy
+or authentication gateway), enable HTTP mode explicitly:
+
+```bash
+docker run --rm -p 8080:8080 ghcr.io/soulteary/hello -listen :8080
+curl http://127.0.0.1:8080/
+curl http://127.0.0.1:8080/healthz
+```
+
+The root response includes request metadata and the non-sensitive proxy
+headers `X-Forwarded-*`, `X-Auth-*`, and `X-Real-IP`. It deliberately does not
+reflect credentials such as `Authorization`, `Proxy-Authorization`, or
+`Cookie`.
+
 Or install the binary directly with Go:
 
 ```bash
@@ -83,6 +97,7 @@ pedro   Pedro the raccoon
 | `-delay`     | Frame delay in milliseconds (must be > 0). | `75`  |
 | `-mono`      | Disable rainbow colors.                  | `false` |
 | `-list`      | List all available animations and exit.  | `false` |
+| `-listen`    | Serve HTTP on an address instead of playing an animation. | `""` |
 | `-version`   | Print version and exit.                  | `false` |
 | `-h`, `-help` | Print usage and exit.                   | `false` |
 
