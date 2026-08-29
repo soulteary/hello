@@ -57,6 +57,28 @@ func Test_Renderer_DrawAdvancesAndWraps(t *testing.T) {
 	}
 }
 
+func Test_Renderer_DrawNormalizesNegativeFrameIndex(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(&buf, true)
+	r.frameIdx = -1
+	r.Draw(twoFrameAnim())
+	if !strings.Contains(buf.String(), "CD") {
+		t.Errorf("negative frame index did not wrap to the last frame: %q", buf.String())
+	}
+	if r.FrameIndex() != 0 {
+		t.Errorf("frame index = %d, want 0", r.FrameIndex())
+	}
+}
+
+func Test_Renderer_DrawClearsEveryLine(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(&buf, true)
+	r.Draw(animation.Animation{Frames: [][]byte{[]byte("A\nB")}})
+	if got := strings.Count(buf.String(), ansiClearEOL); got != 2 {
+		t.Errorf("clear-to-EOL count = %d, want 2; output: %q", got, buf.String())
+	}
+}
+
 func Test_Renderer_DrawMonoOmitsSGRColor(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, true)

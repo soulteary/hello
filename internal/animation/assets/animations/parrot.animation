@@ -1,4 +1,7 @@
 description: The classic Party Parrot.
+author: John Hobbs
+source: https://github.com/jmhobbs/terminal-parrot
+license: MIT
 !--FRAME--!
                         .cccc;;cc;';c.
                       .,:dkdc:;;:c:,:d:.

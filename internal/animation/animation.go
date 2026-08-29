@@ -22,13 +22,16 @@ func LoadFromFile(files fs.FS, path string) (*Animation, error) {
 }
 
 func LoadFromBytes(b []byte) (*Animation, error) {
-	// Handle both Unix (\n) and Windows (\r\n) line endings
-	separator := []byte("!--FRAME--!\n")
-	if bytes.Contains(b, []byte("!--FRAME--!\r\n")) {
-		separator = []byte("!--FRAME--!\r\n")
+	// Normalize CRLF before parsing so files produced on different platforms,
+	// including files with mixed LF/CRLF line endings, behave identically.
+	// A bare carriage return is not a supported line ending and is rejected to
+	// avoid leaking control characters into a terminal or browser response.
+	b = bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n"))
+	if bytes.ContainsRune(b, '\r') {
+		return nil, fmt.Errorf("invalid animation: unsupported bare carriage return")
 	}
 
-	frames := bytes.Split(b, separator)
+	frames := bytes.Split(b, []byte("!--FRAME--!\n"))
 
 	// Split yields N+1 segments for N separators. We need at least one
 	// metadata header plus 2 frames (an "animation" with a single frame is
@@ -44,14 +47,18 @@ func LoadFromBytes(b []byte) (*Animation, error) {
 		if len(parts) != 2 {
 			continue
 		}
-		metadata[strings.TrimSpace(string(parts[0]))] = strings.TrimSpace(string(parts[1]))
+		key := strings.TrimSpace(string(parts[0]))
+		if key == "" {
+			continue
+		}
+		metadata[key] = strings.TrimSpace(string(parts[1]))
 	}
 
 	for i, frame := range frames[1:] {
-		if len(frame) == 0 {
-			return nil, fmt.Errorf("invalid animation: frame %d is empty", i)
+		if len(bytes.TrimSpace(frame)) == 0 {
+			return nil, fmt.Errorf("invalid animation: frame %d is empty", i+1)
 		}
 	}
 
-	return &Animation{metadata, frames[1:]}, nil
+	return &Animation{Metadata: metadata, Frames: frames[1:]}, nil
 }
