@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/soulteary/hello/internal/cli"
+	"github.com/soulteary/hello/internal/httpserver"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".
@@ -26,6 +31,7 @@ func run(args []string) int {
 	mono := fs.Bool("mono", false, "disable rainbow colors")
 	delay := fs.Int("delay", 75, "frame delay in ms (must be > 0)")
 	list := fs.Bool("list", false, "list available animations and exit")
+	listen := fs.String("listen", "", "serve HTTP on this address instead of playing an animation (for example, :8080)")
 	showVersion := fs.Bool("version", false, "print version and exit")
 
 	var animationFlag string
@@ -44,6 +50,20 @@ func run(args []string) int {
 
 	if *showVersion {
 		fmt.Println(version)
+		return 0
+	}
+
+	if addr := strings.TrimSpace(*listen); addr != "" {
+		if *list {
+			fmt.Fprintln(os.Stderr, "listen cannot be combined with list")
+			return 2
+		}
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		if err := httpserver.Run(ctx, httpserver.Options{Addr: addr, Version: version, Stdout: os.Stdout}); err != nil {
+			fmt.Fprintf(os.Stderr, "HTTP server: %v\n", err)
+			return 1
+		}
 		return 0
 	}
 

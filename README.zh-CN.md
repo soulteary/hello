@@ -24,6 +24,19 @@ docker run --rm soulteary/hello
 docker run --rm ghcr.io/soulteary/hello
 ```
 
+如需将镜像作为反向代理或鉴权网关后的轻量 HTTP 后端，请显式启用 HTTP
+模式：
+
+```bash
+docker run --rm -p 8080:8080 ghcr.io/soulteary/hello -listen :8080
+curl http://127.0.0.1:8080/
+curl http://127.0.0.1:8080/healthz
+```
+
+根路径响应会包含请求信息，以及非敏感的 `X-Forwarded-*`、`X-Auth-*` 和
+`X-Real-IP` 代理请求头；`Authorization`、`Proxy-Authorization`、`Cookie`
+等凭据不会被回显。
+
 或使用 Go 直接安装二进制：
 
 ```bash
@@ -82,6 +95,7 @@ pedro   Pedro the raccoon
 | `-delay`     | 帧间隔（毫秒，必须 > 0）。            | `75`    |
 | `-mono`      | 关闭彩虹色，输出单色。                | `false` |
 | `-list`      | 列出所有内置动画并退出。              | `false` |
+| `-listen`    | 监听指定地址提供 HTTP 服务，不播放动画。 | `""` |
 | `-version`   | 打印版本并退出。                      | `false` |
 | `-h`, `-help` | 打印用法并退出。                     | `false` |
 

@@ -56,6 +56,10 @@ LABEL org.opencontainers.image.title="hello" \
 
 COPY --from=build /out/hello /usr/local/bin/hello
 
+# Optional HTTP mode listens on this unprivileged port when the container is
+# started with `-listen :8080`. The default remains the terminal animation.
+EXPOSE 8080
+
 # distroless:nonroot already runs as 65532, but make it explicit.
 USER nonroot:nonroot
 STOPSIGNAL SIGTERM
