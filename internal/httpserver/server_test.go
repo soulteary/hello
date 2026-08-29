@@ -14,6 +14,8 @@ func TestRootReflectsProxyIdentityWithoutCredentials(t *testing.T) {
 	req.Header.Set("X-Auth-Email", "admin@example.com")
 	req.Header.Set("Authorization", "Bearer must-not-leak")
 	req.Header.Set("Cookie", "session=must-not-leak")
+	req.Header.Set("X-Auth-Request-Access-Token", "must-not-leak-auth-token")
+	req.Header.Set("X-Forwarded-Access-Token", "must-not-leak-forwarded-token")
 	recorder := httptest.NewRecorder()
 
 	NewHandler("1.1.0").ServeHTTP(recorder, req)
@@ -74,13 +76,20 @@ func TestHealthAndMethodContracts(t *testing.T) {
 
 func TestSafeReflectedHeader(t *testing.T) {
 	tests := map[string]bool{
-		"X-Forwarded-User":    true,
-		"X-Auth-User":         true,
-		"X-Real-IP":           true,
-		"User-Agent":          true,
-		"Authorization":       false,
-		"Cookie":              false,
-		"Proxy-Authorization": false,
+		"X-Forwarded-User":                true,
+		"X-Forwarded-For":                 true,
+		"X-Forwarded-Proto":               true,
+		"X-Auth-User":                     true,
+		"X-Auth-Email":                    true,
+		"X-Real-IP":                       true,
+		"User-Agent":                      true,
+		"Authorization":                   false,
+		"Cookie":                          false,
+		"Proxy-Authorization":             false,
+		"X-Auth-Request-Access-Token":     false,
+		"X-Forwarded-Access-Token":        false,
+		"X-Forwarded-Authorization":       false,
+		"X-Auth-Unrecognized-Information": false,
 	}
 	for name, want := range tests {
 		if got := safeReflectedHeader(name); got != want {

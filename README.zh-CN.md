@@ -33,9 +33,10 @@ curl http://127.0.0.1:8080/
 curl http://127.0.0.1:8080/healthz
 ```
 
-根路径响应会包含请求信息，以及非敏感的 `X-Forwarded-*`、`X-Auth-*` 和
-`X-Real-IP` 代理请求头；`Authorization`、`Proxy-Authorization`、`Cookie`
-等凭据不会被回显。
+根路径响应会包含请求信息，并仅回显显式白名单中的非敏感路由/身份请求头
+（`X-Forwarded-User`、`X-Auth-User`、`X-Auth-Email`、`X-Auth-Role`、
+`X-Auth-Scopes`、标准 Forwarded 路由头和 `X-Real-IP`）；access token 请求头、
+`Authorization`、`Proxy-Authorization`、`Cookie` 等凭据不会被回显。
 
 或使用 Go 直接安装二进制：
 

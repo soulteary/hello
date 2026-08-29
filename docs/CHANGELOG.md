@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Restrict HTTP-mode proxy header reflection to an explicit routing and
+  identity allowlist so token-bearing `X-Auth-*` / `X-Forwarded-*` headers
+  cannot be returned to clients.
+
 ### Added
 
 - Optional `-listen` HTTP mode with `/healthz` and safe reverse-proxy header
