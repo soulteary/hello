@@ -149,8 +149,23 @@ func writeRequestSummary(w io.Writer, r *http.Request, version string) {
 }
 
 func safeReflectedHeader(name string) bool {
-	name = http.CanonicalHeaderKey(name)
-	return name == "User-Agent" || name == "X-Real-Ip" ||
-		strings.HasPrefix(name, "X-Forwarded-") ||
-		strings.HasPrefix(name, "X-Auth-")
+	switch http.CanonicalHeaderKey(name) {
+	case "User-Agent",
+		"X-Real-Ip",
+		"X-Forwarded-For",
+		"X-Forwarded-Host",
+		"X-Forwarded-Method",
+		"X-Forwarded-Port",
+		"X-Forwarded-Prefix",
+		"X-Forwarded-Proto",
+		"X-Forwarded-Uri",
+		"X-Forwarded-User",
+		"X-Auth-Email",
+		"X-Auth-Role",
+		"X-Auth-Scopes",
+		"X-Auth-User":
+		return true
+	default:
+		return false
+	}
 }

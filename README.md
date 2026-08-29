@@ -33,10 +33,11 @@ curl http://127.0.0.1:8080/
 curl http://127.0.0.1:8080/healthz
 ```
 
-The root response includes request metadata and the non-sensitive proxy
-headers `X-Forwarded-*`, `X-Auth-*`, and `X-Real-IP`. It deliberately does not
-reflect credentials such as `Authorization`, `Proxy-Authorization`, or
-`Cookie`.
+The root response includes request metadata and an explicit allowlist of
+non-sensitive routing/identity headers (`X-Forwarded-User`, `X-Auth-User`,
+`X-Auth-Email`, `X-Auth-Role`, `X-Auth-Scopes`, standard forwarded routing
+headers, and `X-Real-IP`). It deliberately does not reflect credentials such
+as access-token headers, `Authorization`, `Proxy-Authorization`, or `Cookie`.
 
 Or install the binary directly with Go:
 
