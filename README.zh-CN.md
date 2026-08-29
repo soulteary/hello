@@ -162,7 +162,7 @@ stderr 输出明确原因，并以非零状态码退出。
 使用 [`go.mod`](go.mod) 声明的 Go 版本从源码安装：
 
 ```bash
-go install github.com/soulteary/hello@latest
+go install github.com/soulteary/hello/cmd/hello@latest
 ```
 
 每个正式版本都包含 SHA-256 校验文件，以及以下预编译二进制：

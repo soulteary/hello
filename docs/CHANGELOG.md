@@ -62,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The documented `go install` path now targets `cmd/hello`, where the main
+  package lives in the modern project layout.
 - Release archives now include `LICENSE` and `NOTICE`; container images retain
   them under `/usr/share/licenses/hello/`.
 - Windows arm64 artifacts are now built, matching the documented platform

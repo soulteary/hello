@@ -168,7 +168,7 @@ flag combinations fail with a non-zero exit code and a diagnostic on stderr.
 Install from source with the Go version declared in [`go.mod`](go.mod):
 
 ```bash
-go install github.com/soulteary/hello@latest
+go install github.com/soulteary/hello/cmd/hello@latest
 ```
 
 Every tagged release includes SHA-256 checksums and binaries for:
