@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-08-29
+## [2.0.0] - 2026-08-30
 
 ### Added
 
@@ -72,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- The build toolchain was raised from Go 1.26.4 to 1.26.6 to include standard
+- The build toolchain was raised from Go 1.26.4 to 1.27.0 to include standard
   library fixes reported by `govulncheck` for `html/template`, `net/http`,
   `crypto/tls` and `encoding/asn1`.
 - HTML responses include a restrictive Content Security Policy and standard

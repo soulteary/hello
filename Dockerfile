@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
 # ---------- build stage ----------
-# Pin a Go version that matches go.mod's `go 1.26.6` directive.
-FROM --platform=$BUILDPLATFORM golang:1.26.6-alpine AS build
+# Pin a Go version that matches go.mod's `go 1.27.0` directive.
+FROM --platform=$BUILDPLATFORM golang:1.27.0-alpine AS build
 
 # TARGETOS/TARGETARCH are provided by buildx for multi-arch builds.
 ARG TARGETOS
