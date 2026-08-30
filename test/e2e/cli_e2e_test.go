@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/soulteary/hello/internal/animation"
 )
 
 // testBinary holds the path to a binary compiled once for the whole e2e suite.
@@ -175,7 +177,7 @@ func Test_HTTP_ContentNegotiation(t *testing.T) {
 	if !strings.HasPrefix(response.Header.Get("Content-Type"), "text/plain") {
 		t.Errorf("curl Content-Type = %q", response.Header.Get("Content-Type"))
 	}
-	if !bytes.Contains(body, []byte("Hello from soulteary/hello!")) || !bytes.Contains(body, []byte(".cccc")) {
+	if !bytes.Contains(body, []byte("Hello from soulteary/hello!")) || !hasAnimationFramePrefix(body, animation.NewInventory()["parrot"].Frames) {
 		t.Errorf("curl response is missing the parrot frame or diagnostics: %s", body)
 	}
 
@@ -213,6 +215,21 @@ func Test_HTTP_ContentNegotiation(t *testing.T) {
 	if response.StatusCode != http.StatusOK || string(health) != "ok\n" {
 		t.Errorf("health response = %d %q", response.StatusCode, health)
 	}
+}
+
+func hasAnimationFramePrefix(body []byte, frames [][]byte) bool {
+	for _, frame := range frames {
+		prefix := make([]byte, 0, len(frame)+2)
+		prefix = append(prefix, frame...)
+		if len(prefix) == 0 || prefix[len(prefix)-1] != '\n' {
+			prefix = append(prefix, '\n')
+		}
+		prefix = append(prefix, '\n')
+		if bytes.HasPrefix(body, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func startHTTPServer(t *testing.T) (string, func()) {
