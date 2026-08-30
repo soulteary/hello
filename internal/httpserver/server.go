@@ -548,7 +548,7 @@ var browserPage = template.Must(template.New("browser").Parse(`<!doctype html>
     .dot { width: 10px; height: 10px; border-radius: 50%; background: #ff6b6b; box-shadow: 17px 0 #ffd166, 34px 0 #73e2a7; margin-right: 34px; }
     pre { min-height: 24rem; margin: 0; overflow: auto; padding: clamp(16px, 4vw, 32px); color: {{if .Mono}}#d6e2f0{{else}}#ff8787{{end}}; font: clamp(8px, 1.35vw, 16px)/1.08 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; white-space: pre; }
     .status { margin: 12px 2px 0; color: #71859d; font-size: 13px; }
-    .project { margin: 18px 2px 0; color: #71859d; font-size: 13px; text-align: center; }
+    .project { margin-bottom: 10px; color: #71859d; font-size: 13px; font-style: italic; }
     .project a { color: #90a4bb; text-underline-offset: 3px; }
     .project a:hover { color: #d6e2f0; }
     code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
@@ -557,6 +557,7 @@ var browserPage = template.Must(template.New("browser").Parse(`<!doctype html>
 <body>
   <main>
     <h1>hello from the terminal</h1>
+    <div class="project">Project: <a href="{{.ProjectURL}}">{{.ProjectURL}}</a></div>
     <p class="lede">The server is pushing the <code>{{.Animation}}</code> animation one ASCII frame at a time.</p>
     <section class="terminal" aria-label="Animated ASCII art terminal">
       <div class="bar"><span class="dot" aria-hidden="true"></span>hello {{if .Version}}· {{.Version}}{{end}}</div>
@@ -564,7 +565,6 @@ var browserPage = template.Must(template.New("browser").Parse(`<!doctype html>
     </section>
     <p id="status" class="status" role="status">Connecting to the event stream…</p>
     <noscript><p class="status">JavaScript is disabled, so this page shows the first frame only.</p></noscript>
-    <footer class="project">Project: <a href="{{.ProjectURL}}">{{.ProjectURL}}</a></footer>
   </main>
   <script>
     (() => {
