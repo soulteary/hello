@@ -158,24 +158,27 @@ func Test_HTTP_ContentNegotiation(t *testing.T) {
 	baseURL, stop := startHTTPServer(t)
 	defer stop()
 
-	req, err := http.NewRequest(http.MethodGet, baseURL+"/", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("User-Agent", "curl/8.5.0")
-	response, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	body, err := io.ReadAll(response.Body)
-	if err := response.Body.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(response.Header.Get("Content-Type"), "text/plain") {
-		t.Errorf("curl Content-Type = %q", response.Header.Get("Content-Type"))
+	t.Run("curl text response", func(t *testing.T) {
+		assertCurlTextResponse(t, baseURL)
+	})
+	t.Run("curl HEAD response", func(t *testing.T) {
+		assertCurlHeadResponse(t, baseURL)
+	})
+	t.Run("browser HTML response", func(t *testing.T) {
+		assertBrowserHTMLResponse(t, baseURL)
+	})
+	t.Run("health response", func(t *testing.T) {
+		assertHealthResponse(t, baseURL)
+	})
+}
+
+func assertCurlTextResponse(t *testing.T, baseURL string) {
+	t.Helper()
+	response, body := requestHTTP(t, http.MethodGet, baseURL+"/", map[string]string{
+		"User-Agent": "curl/8.5.0",
+	})
+	if contentType := response.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "text/plain") {
+		t.Errorf("curl Content-Type = %q", contentType)
 	}
 	if response.Header.Get("Project") != "https://github.com/soulteary/hello" {
 		t.Errorf("curl Project header = %q", response.Header.Get("Project"))
@@ -186,59 +189,60 @@ func Test_HTTP_ContentNegotiation(t *testing.T) {
 	if !bytes.HasSuffix(body, []byte("Project: https://github.com/soulteary/hello\n")) {
 		t.Errorf("curl response does not end with the project URL: %s", body)
 	}
+}
 
-	req, err = http.NewRequest(http.MethodHead, baseURL+"/", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("User-Agent", "curl/8.5.0")
-	response, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := response.Body.Close(); err != nil {
-		t.Fatal(err)
-	}
+func assertCurlHeadResponse(t *testing.T, baseURL string) {
+	t.Helper()
+	response, _ := requestHTTP(t, http.MethodHead, baseURL+"/", map[string]string{
+		"User-Agent": "curl/8.5.0",
+	})
 	if response.Header.Get("Project") != "https://github.com/soulteary/hello" {
 		t.Errorf("curl HEAD Project header = %q", response.Header.Get("Project"))
 	}
+}
 
-	req, err = http.NewRequest(http.MethodGet, baseURL+"/", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("Accept", "text/html")
-	response, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	body, err = io.ReadAll(response.Body)
-	if err := response.Body.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
+func assertBrowserHTMLResponse(t *testing.T, baseURL string) {
+	t.Helper()
+	response, body := requestHTTP(t, http.MethodGet, baseURL+"/", map[string]string{
+		"Accept": "text/html",
+	})
 	if !strings.HasPrefix(response.Header.Get("Content-Type"), "text/html") ||
 		!bytes.Contains(body, []byte(`new EventSource(eventsURL)`)) ||
 		!bytes.Contains(body, []byte(`Project: <a href="https://github.com/soulteary/hello">https://github.com/soulteary/hello</a>`)) {
 		t.Errorf("browser response is not the animated HTML page: %s", body)
 	}
+}
 
-	response, err = http.Get(baseURL + "/healthz")
-	if err != nil {
-		t.Fatal(err)
-	}
-	health, err := io.ReadAll(response.Body)
-	if err := response.Body.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
+func assertHealthResponse(t *testing.T, baseURL string) {
+	t.Helper()
+	response, health := requestHTTP(t, http.MethodGet, baseURL+"/healthz", nil)
 	if response.StatusCode != http.StatusOK || string(health) != "ok\n" {
 		t.Errorf("health response = %d %q", response.StatusCode, health)
 	}
+}
+
+func requestHTTP(t *testing.T, method, url string, headers map[string]string) (*http.Response, []byte) {
+	t.Helper()
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, readErr := io.ReadAll(response.Body)
+	closeErr := response.Body.Close()
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if closeErr != nil {
+		t.Fatal(closeErr)
+	}
+	return response, body
 }
 
 func hasAnimationFramePrefix(body []byte, frames [][]byte) bool {
