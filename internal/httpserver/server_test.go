@@ -404,7 +404,20 @@ func TestEventStreamOverHTTP(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/events", nil)
+	response := openEventStream(t, ctx, server.URL)
+	defer closeResponseBody(t, response.Body)
+
+	assertEventStreamHeaders(t, response)
+	event := readFirstFrameEvent(t, response.Body)
+	if event.Animation != "parrot" || event.Frame != "PARROT-A" || event.Index != 0 || event.Color != browserColors[0] {
+		t.Errorf("unexpected first event: %+v", event)
+	}
+	cancel()
+}
+
+func openEventStream(t *testing.T, ctx context.Context, baseURL string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/events", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -412,11 +425,18 @@ func TestEventStreamOverHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		if err := response.Body.Close(); err != nil {
-			t.Errorf("close response body: %v", err)
-		}
-	}()
+	return response
+}
+
+func closeResponseBody(t *testing.T, body io.Closer) {
+	t.Helper()
+	if err := body.Close(); err != nil {
+		t.Errorf("close response body: %v", err)
+	}
+}
+
+func assertEventStreamHeaders(t *testing.T, response *http.Response) {
+	t.Helper()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d", response.StatusCode)
 	}
@@ -426,8 +446,11 @@ func TestEventStreamOverHTTP(t *testing.T) {
 	if response.Header.Get("X-Accel-Buffering") != "no" {
 		t.Errorf("X-Accel-Buffering = %q", response.Header.Get("X-Accel-Buffering"))
 	}
+}
 
-	scanner := bufio.NewScanner(response.Body)
+func readFirstFrameEvent(t *testing.T, body io.Reader) frameEvent {
+	t.Helper()
+	scanner := bufio.NewScanner(body)
 	var data string
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -445,10 +468,7 @@ func TestEventStreamOverHTTP(t *testing.T) {
 	if err := json.Unmarshal([]byte(data), &event); err != nil {
 		t.Fatalf("decode event %q: %v", data, err)
 	}
-	if event.Animation != "parrot" || event.Frame != "PARROT-A" || event.Index != 0 || event.Color != browserColors[0] {
-		t.Errorf("unexpected first event: %+v", event)
-	}
-	cancel()
+	return event
 }
 
 func TestStreamAnimationLifecycleAndErrors(t *testing.T) {
