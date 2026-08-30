@@ -60,7 +60,7 @@ func TestRootContentNegotiation(t *testing.T) {
 			userAgent:   "curl/8.5.0",
 			accept:      "*/*",
 			contentType: "text/plain",
-			contains:    []string{"Hello from soulteary/hello!", "Version: 2.0.0"},
+			contains:    []string{"Hello from soulteary/hello!\n\nVersion: 2.0.0", "Project: " + projectURL},
 			textFrames:  []string{"PARROT-A", "PARROT-B\n"},
 		},
 		{
@@ -69,7 +69,7 @@ func TestRootContentNegotiation(t *testing.T) {
 			userAgent:   "test-browser",
 			accept:      "text/html,application/xhtml+xml",
 			contentType: "text/html",
-			contains:    []string{"<!doctype html>", "PARROT-A", "new EventSource(eventsURL)"},
+			contains:    []string{"<!doctype html>", "PARROT-A", "new EventSource(eventsURL)", `Project: <a href="` + projectURL + `">` + projectURL + `</a>`},
 		},
 		{
 			name:        "browser user agent fallback",
@@ -127,6 +127,9 @@ func TestRootContentNegotiation(t *testing.T) {
 			if got := response.Header.Get("Content-Type"); !strings.HasPrefix(got, tc.contentType) {
 				t.Errorf("Content-Type = %q, want prefix %q", got, tc.contentType)
 			}
+			if got := response.Header.Get(projectHeader); got != projectURL {
+				t.Errorf("%s header = %q, want %q", projectHeader, got, projectURL)
+			}
 			for _, want := range tc.contains {
 				if !bytes.Contains(body, []byte(want)) {
 					t.Errorf("response does not contain %q: %s", want, body)
@@ -141,6 +144,23 @@ func TestRootContentNegotiation(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRootHeadIncludesProjectHeader(t *testing.T) {
+	req := httptest.NewRequest(http.MethodHead, "http://hello.example/", nil)
+	req.Header.Set("User-Agent", "curl/8.5.0")
+	recorder := httptest.NewRecorder()
+
+	newSmallHandler(t, HandlerOptions{}).ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", recorder.Code)
+	}
+	if recorder.Body.Len() != 0 {
+		t.Errorf("HEAD response has a body: %q", recorder.Body.String())
+	}
+	if got := recorder.Header().Get(projectHeader); got != projectURL {
+		t.Errorf("%s header = %q, want %q", projectHeader, got, projectURL)
 	}
 }
 
@@ -224,6 +244,10 @@ func TestHTMLTemplateEscapesVersion(t *testing.T) {
 	}
 	if !strings.Contains(recorder.Header().Get("Content-Security-Policy"), "connect-src 'self'") {
 		t.Errorf("unexpected CSP: %s", recorder.Header().Get("Content-Security-Policy"))
+	}
+	wantLink := `Project: <a href="` + projectURL + `">` + projectURL + `</a>`
+	if !strings.Contains(body, wantLink) {
+		t.Errorf("project footer is missing: %s", body)
 	}
 }
 
@@ -552,6 +576,9 @@ func TestWriteTextResponseNewlineHandling(t *testing.T) {
 		}
 		if strings.Contains(output.String(), "Version:") {
 			t.Errorf("empty version was rendered: %q", output.String())
+		}
+		if !strings.HasSuffix(output.String(), "Project: "+projectURL+"\n") {
+			t.Errorf("project is not the final line: %q", output.String())
 		}
 	}
 }

@@ -177,8 +177,30 @@ func Test_HTTP_ContentNegotiation(t *testing.T) {
 	if !strings.HasPrefix(response.Header.Get("Content-Type"), "text/plain") {
 		t.Errorf("curl Content-Type = %q", response.Header.Get("Content-Type"))
 	}
-	if !bytes.Contains(body, []byte("Hello from soulteary/hello!")) || !hasAnimationFramePrefix(body, animation.NewInventory()["parrot"].Frames) {
+	if response.Header.Get("Project") != "https://github.com/soulteary/hello" {
+		t.Errorf("curl Project header = %q", response.Header.Get("Project"))
+	}
+	if !bytes.Contains(body, []byte("Hello from soulteary/hello!\n\nVersion: ")) || !hasAnimationFramePrefix(body, animation.NewInventory()["parrot"].Frames) {
 		t.Errorf("curl response is missing the parrot frame or diagnostics: %s", body)
+	}
+	if !bytes.HasSuffix(body, []byte("Project: https://github.com/soulteary/hello\n")) {
+		t.Errorf("curl response does not end with the project URL: %s", body)
+	}
+
+	req, err = http.NewRequest(http.MethodHead, baseURL+"/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("User-Agent", "curl/8.5.0")
+	response, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := response.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if response.Header.Get("Project") != "https://github.com/soulteary/hello" {
+		t.Errorf("curl HEAD Project header = %q", response.Header.Get("Project"))
 	}
 
 	req, err = http.NewRequest(http.MethodGet, baseURL+"/", nil)
@@ -197,7 +219,9 @@ func Test_HTTP_ContentNegotiation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(response.Header.Get("Content-Type"), "text/html") || !bytes.Contains(body, []byte(`new EventSource(eventsURL)`)) {
+	if !strings.HasPrefix(response.Header.Get("Content-Type"), "text/html") ||
+		!bytes.Contains(body, []byte(`new EventSource(eventsURL)`)) ||
+		!bytes.Contains(body, []byte(`Project: <a href="https://github.com/soulteary/hello">https://github.com/soulteary/hello</a>`)) {
 		t.Errorf("browser response is not the animated HTML page: %s", body)
 	}
 

@@ -47,16 +47,18 @@ docker run --rm -p 8080:8080 ghcr.io/soulteary/hello -listen :8080
 
 - `curl` 和其他非浏览器客户端得到 `text/plain`：从所选动画中随机取一帧原始
   ASCII 图案，后面是有助于排查代理链路且不包含凭据的请求摘要。服务启动时会
-  缓存去重后的全部帧，请求期间只需在内存中完成选择。
+  缓存去重后的全部帧，请求期间只需在内存中完成选择；响应最后一行标明项目
+  的规范地址。
 - 浏览器得到终端风格 HTML 页面。页面连接 `/events` 并保留代理对外路径前缀，
   服务端通过 Server-Sent Events（SSE）持续推送动画帧；JavaScript 在每帧到达后
-  刷新 `<pre>` 内容。
+  刷新 `<pre>` 内容，页面底部同时展示项目地址文本链接。
 - `?format=text` 和 `?format=html` 可覆盖自动判断；`plain` 是 `text` 的别名。
 
 分别测试文本和 HTML 响应：
 
 ```bash
 curl http://127.0.0.1:8080/
+curl -I http://127.0.0.1:8080/
 curl http://127.0.0.1:8080/healthz
 
 # 在非浏览器客户端中强制查看 HTML
@@ -107,8 +109,10 @@ docker run --rm -p 8080:8080 ghcr.io/soulteary/hello \
 
 ### 请求信息回显范围
 
-文本响应包含方法、URL、Host、容器主机名和版本，仅回显以下明确允许的路由或
-身份请求头：
+文本响应包含方法、URL、Host、容器主机名和版本。问候语与版本之间保留一个
+空行，最后一行固定为 `Project: https://github.com/soulteary/hello`。根路径响应
+（包括 `HEAD`）还会在 `Project` 响应头中提供同一地址。诊断正文仅回显以下明确
+允许的路由或身份请求头：
 
 - `Forwarded`、`User-Agent`、`X-Real-IP`
 - `X-Forwarded-For`、`X-Forwarded-Host`、`X-Forwarded-Method`、

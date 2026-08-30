@@ -28,6 +28,8 @@ const (
 	defaultFrameDelay  = 75 * time.Millisecond
 	maxFrameDelay      = 60 * time.Second
 	defaultAnimation   = "parrot"
+	projectHeader      = "Project"
+	projectURL         = "https://github.com/soulteary/hello"
 )
 
 var browserColors = []string{
@@ -207,6 +209,7 @@ func (h handler) health(w http.ResponseWriter, r *http.Request) {
 
 func (h handler) root(w http.ResponseWriter, r *http.Request) {
 	setResponseHeaders(w)
+	w.Header().Set(projectHeader, projectURL)
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
@@ -242,15 +245,17 @@ func (h handler) html(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = browserPage.Execute(w, struct {
-		Version   string
-		Animation string
-		Frame     string
-		Mono      bool
+		Version    string
+		Animation  string
+		Frame      string
+		Mono       bool
+		ProjectURL string
 	}{
-		Version:   h.version,
-		Animation: h.name,
-		Frame:     string(h.animation.Frames[0]),
-		Mono:      h.mono,
+		Version:    h.version,
+		Animation:  h.name,
+		Frame:      string(h.animation.Frames[0]),
+		Mono:       h.mono,
+		ProjectURL: projectURL,
 	})
 }
 
@@ -392,6 +397,7 @@ func writeTextResponse(w io.Writer, r *http.Request, version, frame string) {
 func writeRequestSummary(w io.Writer, r *http.Request, version string) {
 	hostname, _ := os.Hostname()
 	fmt.Fprintln(w, "Hello from soulteary/hello!")
+	fmt.Fprintln(w)
 	if strings.TrimSpace(version) != "" {
 		fmt.Fprintf(w, "Version: %s\n", version)
 	}
@@ -414,6 +420,7 @@ func writeRequestSummary(w io.Writer, r *http.Request, version string) {
 			fmt.Fprintf(w, "%s: %s\n", key, value)
 		}
 	}
+	fmt.Fprintf(w, "Project: %s\n", projectURL)
 }
 
 func safeReflectedHeader(name string) bool {
@@ -541,6 +548,9 @@ var browserPage = template.Must(template.New("browser").Parse(`<!doctype html>
     .dot { width: 10px; height: 10px; border-radius: 50%; background: #ff6b6b; box-shadow: 17px 0 #ffd166, 34px 0 #73e2a7; margin-right: 34px; }
     pre { min-height: 24rem; margin: 0; overflow: auto; padding: clamp(16px, 4vw, 32px); color: {{if .Mono}}#d6e2f0{{else}}#ff8787{{end}}; font: clamp(8px, 1.35vw, 16px)/1.08 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; white-space: pre; }
     .status { margin: 12px 2px 0; color: #71859d; font-size: 13px; }
+    .project { margin: 18px 2px 0; color: #71859d; font-size: 13px; text-align: center; }
+    .project a { color: #90a4bb; text-underline-offset: 3px; }
+    .project a:hover { color: #d6e2f0; }
     code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
   </style>
 </head>
@@ -554,6 +564,7 @@ var browserPage = template.Must(template.New("browser").Parse(`<!doctype html>
     </section>
     <p id="status" class="status" role="status">Connecting to the event stream…</p>
     <noscript><p class="status">JavaScript is disabled, so this page shows the first frame only.</p></noscript>
+    <footer class="project">Project: <a href="{{.ProjectURL}}">{{.ProjectURL}}</a></footer>
   </main>
   <script>
     (() => {

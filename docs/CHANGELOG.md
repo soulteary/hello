@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   randomly selected raw ASCII animation frame plus safe request diagnostics,
   while browsers receive a responsive terminal-style HTML page. Distinct text
   frames are cached once per handler for efficient concurrent requests.
+- Canonical project URL discovery through the browser footer, the final
+  plain-text response line and the root endpoint's `Project` response header.
 - `/events` Server-Sent Events endpoint that pushes animation frames and color
   changes to the browser, reconnects automatically and stops on client
   cancellation.
