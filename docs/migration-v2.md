@@ -21,6 +21,10 @@ browser.
 Clients that parse the root body by line number must be updated because the
 ASCII frame now precedes `Hello from soulteary/hello!`. Prefer matching the
 named diagnostic fields, or use `/healthz` when only availability matters.
+The greeting and version are separated by one blank line, and the body ends
+with `Project: https://github.com/soulteary/hello`. The same URL is available
+from the root response's `Project` header, including for `HEAD` requests, and
+from the browser page footer.
 
 Representation selection follows these rules, in order:
 
@@ -94,6 +98,9 @@ are built.
 如果客户端按固定行号解析根路径，需要调整逻辑，因为 ASCII 帧会出现在
 `Hello from soulteary/hello!` 之前。建议根据字段名称匹配；如果只检查可用性，
 应改用 `/healthz`。
+问候语和版本之间保留一个空行，正文最后一行固定为
+`Project: https://github.com/soulteary/hello`。根路径响应（包括 `HEAD`）的
+`Project` 响应头以及浏览器页面底部也会提供同一地址。
 
 响应形式按以下优先级判断：
 

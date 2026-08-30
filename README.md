@@ -50,11 +50,13 @@ The root endpoint negotiates its representation from the request:
 - `curl` and other non-browser clients receive `text/plain`: one randomly
   selected raw ASCII frame followed by useful, non-sensitive request
   diagnostics. Distinct frames are cached when the handler starts, so requests
-  only perform an in-memory selection.
+  only perform an in-memory selection. The final line identifies the canonical
+  project URL.
 - Browsers receive a terminal-style HTML page. The page opens `/events` while
   preserving an external proxy path prefix, and the server continuously pushes
   animation frames using Server-Sent Events (SSE). JavaScript replaces the
-  `<pre>` contents as each frame arrives.
+  `<pre>` contents as each frame arrives; a text link to the project appears in
+  the page footer.
 - `?format=text` and `?format=html` override automatic detection. `plain` is an
   alias for `text`.
 
@@ -62,6 +64,7 @@ Try both representations:
 
 ```bash
 curl http://127.0.0.1:8080/
+curl -I http://127.0.0.1:8080/
 curl http://127.0.0.1:8080/healthz
 
 # Force HTML for inspection from a non-browser client
@@ -115,8 +118,11 @@ front of `/events`, disable response buffering for that route; hello also emits
 
 ### Reflected request information
 
-The plain-text response includes method, URL, host, hostname and version. It
-reflects only this explicit allowlist of common routing/identity headers:
+The plain-text response includes method, URL, host, hostname and version. A
+blank line separates the greeting from the version, and the final line is
+`Project: https://github.com/soulteary/hello`. Root responses also expose that
+URL in the `Project` response header, including `HEAD` requests. The diagnostic
+body reflects only this explicit allowlist of common routing/identity headers:
 
 - `Forwarded`, `User-Agent`, `X-Real-IP`
 - `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Method`,
