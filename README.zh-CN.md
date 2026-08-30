@@ -2,7 +2,7 @@
 
 [![test](https://github.com/soulteary/hello/actions/workflows/test.yml/badge.svg)](https://github.com/soulteary/hello/actions/workflows/test.yml)
 [![docker](https://github.com/soulteary/hello/actions/workflows/docker.yml/badge.svg)](https://github.com/soulteary/hello/actions/workflows/docker.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/soulteary/hello)](https://goreportcard.com/report/github.com/soulteary/hello)
+[![Go Report Card](.github/goreportcard.svg)](.github/goreportcard-report.md)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/soulteary/hello)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
