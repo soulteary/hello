@@ -29,42 +29,56 @@ func Test_LoadFromFile_Missing(t *testing.T) {
 }
 
 func Test_LoadFromBytes(t *testing.T) {
-	t.Run("invalid: no frames", func(t *testing.T) {
-		_, err := LoadFromBytes([]byte{})
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-	})
+	t.Run("invalid input", testLoadFromBytesInvalidInput)
+	t.Run("valid document", testLoadFromBytesValidDocument)
+	t.Run("line endings", testLoadFromBytesLineEndings)
+	t.Run("metadata", testLoadFromBytesMetadata)
+}
 
-	t.Run("invalid: one frame", func(t *testing.T) {
-		_, err := LoadFromBytes([]byte("frame"))
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-	})
+func testLoadFromBytesInvalidInput(t *testing.T) {
+	t.Helper()
+	tests := []struct {
+		name        string
+		input       string
+		wantMessage string
+	}{
+		{name: "no frames"},
+		{name: "one frame", input: "frame"},
+		{name: "empty frame", input: "!--FRAME--!\n"},
+		{name: "bare carriage return", input: "description: bad\r!--FRAME--!\nA\n!--FRAME--!\nB", wantMessage: "bare carriage return"},
+		{name: "whitespace-only frame", input: "description: bad\n!--FRAME--!\n \t\n!--FRAME--!\nB", wantMessage: "frame 1 is empty"},
+		{name: "trailing separator", input: "description: bad\n!--FRAME--!\nA\n!--FRAME--!\n", wantMessage: "frame 2 is empty"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := LoadFromBytes([]byte(tc.input))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if tc.wantMessage != "" && !strings.Contains(err.Error(), tc.wantMessage) {
+				t.Fatalf("error = %v, want message containing %q", err, tc.wantMessage)
+			}
+		})
+	}
+}
 
-	t.Run("invalid: empty frame", func(t *testing.T) {
-		_, err := LoadFromBytes([]byte("!--FRAME--!\n"))
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-	})
+func testLoadFromBytesValidDocument(t *testing.T) {
+	t.Helper()
+	a, err := LoadFromBytes([]byte("description: test\n!--FRAME--!\nA\n!--FRAME--!\nB\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a.Frames) != 2 {
+		t.Fatalf("expected 2 frames, got %d", len(a.Frames))
+	}
+	if a.Metadata["description"] != "test" {
+		t.Errorf("description = %q, want test", a.Metadata["description"])
+	}
+}
 
-	t.Run("valid", func(t *testing.T) {
-		a, err := LoadFromBytes([]byte("description: test\n!--FRAME--!\nA\n!--FRAME--!\nB\n"))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if len(a.Frames) != 2 {
-			t.Fatalf("expected 2 frames, got %d", len(a.Frames))
-		}
-		if a.Metadata["description"] != "test" {
-			t.Errorf("description = %q, want test", a.Metadata["description"])
-		}
-	})
-
-	t.Run("valid CRLF", func(t *testing.T) {
+func testLoadFromBytesLineEndings(t *testing.T) {
+	t.Helper()
+	t.Run("CRLF", func(t *testing.T) {
 		a, err := LoadFromBytes([]byte("description: windows\r\n!--FRAME--!\r\nA\r\n!--FRAME--!\r\nB\r\n"))
 		if err != nil {
 			t.Fatal(err)
@@ -73,8 +87,7 @@ func Test_LoadFromBytes(t *testing.T) {
 			t.Errorf("first frame = %q, want %q", got, "A\\n")
 		}
 	})
-
-	t.Run("valid mixed line endings", func(t *testing.T) {
+	t.Run("mixed", func(t *testing.T) {
 		a, err := LoadFromBytes([]byte("description: mixed\r\n!--FRAME--!\nA\r\n!--FRAME--!\r\nB"))
 		if err != nil {
 			t.Fatal(err)
@@ -83,40 +96,20 @@ func Test_LoadFromBytes(t *testing.T) {
 			t.Fatalf("frames = %d, want 2", len(a.Frames))
 		}
 	})
+}
 
-	t.Run("metadata trims values and ignores empty keys", func(t *testing.T) {
-		a, err := LoadFromBytes([]byte(" description : value:with:colons \n: ignored\nnot metadata\n!--FRAME--!\nA\n!--FRAME--!\nB"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := a.Metadata["description"]; got != "value:with:colons" {
-			t.Errorf("description = %q", got)
-		}
-		if _, ok := a.Metadata[""]; ok {
-			t.Error("empty metadata key was retained")
-		}
-	})
-
-	t.Run("invalid bare carriage return", func(t *testing.T) {
-		_, err := LoadFromBytes([]byte("description: bad\r!--FRAME--!\nA\n!--FRAME--!\nB"))
-		if err == nil || !strings.Contains(err.Error(), "bare carriage return") {
-			t.Fatalf("error = %v, want bare-carriage-return error", err)
-		}
-	})
-
-	t.Run("invalid whitespace-only frame", func(t *testing.T) {
-		_, err := LoadFromBytes([]byte("description: bad\n!--FRAME--!\n \t\n!--FRAME--!\nB"))
-		if err == nil || !strings.Contains(err.Error(), "frame 1 is empty") {
-			t.Fatalf("error = %v, want empty-frame error", err)
-		}
-	})
-
-	t.Run("invalid trailing separator", func(t *testing.T) {
-		_, err := LoadFromBytes([]byte("description: bad\n!--FRAME--!\nA\n!--FRAME--!\n"))
-		if err == nil || !strings.Contains(err.Error(), "frame 2 is empty") {
-			t.Fatalf("error = %v, want empty trailing-frame error", err)
-		}
-	})
+func testLoadFromBytesMetadata(t *testing.T) {
+	t.Helper()
+	a, err := LoadFromBytes([]byte(" description : value:with:colons \n: ignored\nnot metadata\n!--FRAME--!\nA\n!--FRAME--!\nB"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := a.Metadata["description"]; got != "value:with:colons" {
+		t.Errorf("description = %q", got)
+	}
+	if _, ok := a.Metadata[""]; ok {
+		t.Error("empty metadata key was retained")
+	}
 }
 
 // FuzzLoadFromBytes ensures the parser never panics on arbitrary input and
