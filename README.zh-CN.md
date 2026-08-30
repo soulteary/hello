@@ -45,8 +45,9 @@ docker run --rm -p 8080:8080 ghcr.io/soulteary/hello -listen :8080
 
 根路径会根据请求自动选择响应形式：
 
-- `curl` 和其他非浏览器客户端得到 `text/plain`：一帧原始 ASCII 图案，后面是
-  有助于排查代理链路且不包含凭据的请求摘要。
+- `curl` 和其他非浏览器客户端得到 `text/plain`：从所选动画中随机取一帧原始
+  ASCII 图案，后面是有助于排查代理链路且不包含凭据的请求摘要。服务启动时会
+  缓存去重后的全部帧，请求期间只需在内存中完成选择。
 - 浏览器得到终端风格 HTML 页面。页面连接 `/events` 并保留代理对外路径前缀，
   服务端通过 Server-Sent Events（SSE）持续推送动画帧；JavaScript 在每帧到达后
   刷新 `<pre>` 内容。
@@ -94,7 +95,7 @@ docker run --rm -p 8080:8080 ghcr.io/soulteary/hello \
   -listen :8080 -animation cat -delay 120 -mono
 ```
 
-- `-animation` / `-a` 同时决定 curl 首帧和浏览器动画。
+- `-animation` / `-a` 决定终端客户端和浏览器动画使用的帧集合。
 - `-delay` 决定 SSE 推送帧间隔。
 - `-mono` 关闭浏览器颜色循环。
 - `-loops`、`-list` 不能与 `-listen` 组合使用。

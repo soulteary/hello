@@ -12,7 +12,7 @@ browser.
 
 | Request | Before 2.0 | 2.0 |
 | --- | --- | --- |
-| `curl /` | Plain request summary. | First ASCII animation frame, blank line, then the request summary. |
+| `curl /` | Plain request summary. | One randomly selected ASCII animation frame, blank line, then the request summary. |
 | Browser `GET /` | Plain request summary. | HTML terminal that consumes the `/events` SSE stream. |
 | `HEAD /` | `200`, text content type. | `200`, with the content type selected by the same negotiation rules as `GET`. |
 | `GET /events` | Not available. | Long-lived `text/event-stream` response. |
@@ -85,7 +85,7 @@ are built.
 
 | 请求 | 2.0 之前 | 2.0 |
 | --- | --- | --- |
-| `curl /` | 纯文本请求摘要。 | 第一帧 ASCII 动画、一个空行，然后是请求摘要。 |
+| `curl /` | 纯文本请求摘要。 | 随机选择的一帧 ASCII 动画、一个空行，然后是请求摘要。 |
 | 浏览器 `GET /` | 纯文本请求摘要。 | 消费 `/events` SSE 流的 HTML 终端。 |
 | `HEAD /` | `200`，文本类型。 | `200`，Content-Type 与 `GET` 使用相同协商规则。 |
 | `GET /events` | 不存在。 | 长连接 `text/event-stream` 响应。 |

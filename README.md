@@ -47,8 +47,10 @@ docker run --rm -p 8080:8080 ghcr.io/soulteary/hello -listen :8080
 
 The root endpoint negotiates its representation from the request:
 
-- `curl` and other non-browser clients receive `text/plain`: one raw ASCII
-  frame followed by useful, non-sensitive request diagnostics.
+- `curl` and other non-browser clients receive `text/plain`: one randomly
+  selected raw ASCII frame followed by useful, non-sensitive request
+  diagnostics. Distinct frames are cached when the handler starts, so requests
+  only perform an in-memory selection.
 - Browsers receive a terminal-style HTML page. The page opens `/events` while
   preserving an external proxy path prefix, and the server continuously pushes
   animation frames using Server-Sent Events (SSE). JavaScript replaces the
@@ -99,7 +101,8 @@ docker run --rm -p 8080:8080 ghcr.io/soulteary/hello \
   -listen :8080 -animation cat -delay 120 -mono
 ```
 
-- `-animation` / `-a` selects the terminal frame and browser stream.
+- `-animation` / `-a` selects the frame set used by terminal clients and the
+  browser stream.
 - `-delay` controls the SSE frame interval.
 - `-mono` disables browser color cycling.
 - `-loops` and `-list` cannot be combined with `-listen`.

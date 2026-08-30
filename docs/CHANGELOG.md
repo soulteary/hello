@@ -12,8 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Content-negotiated HTTP root: curl and other non-browser clients receive one
-  raw ASCII animation frame plus safe request diagnostics, while browsers
-  receive a responsive terminal-style HTML page.
+  randomly selected raw ASCII animation frame plus safe request diagnostics,
+  while browsers receive a responsive terminal-style HTML page. Distinct text
+  frames are cached once per handler for efficient concurrent requests.
 - `/events` Server-Sent Events endpoint that pushes animation frames and color
   changes to the browser, reconnects automatically and stops on client
   cancellation.

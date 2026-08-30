@@ -52,6 +52,7 @@ func TestRootContentNegotiation(t *testing.T) {
 		accept      string
 		contentType string
 		contains    []string
+		textFrames  []string
 	}{
 		{
 			name:        "curl receives one plain frame and diagnostics",
@@ -59,7 +60,8 @@ func TestRootContentNegotiation(t *testing.T) {
 			userAgent:   "curl/8.5.0",
 			accept:      "*/*",
 			contentType: "text/plain",
-			contains:    []string{"PARROT-A", "Hello from soulteary/hello!", "Version: 2.0.0"},
+			contains:    []string{"Hello from soulteary/hello!", "Version: 2.0.0"},
+			textFrames:  []string{"PARROT-A", "PARROT-B\n"},
 		},
 		{
 			name:        "browser accept receives HTML",
@@ -89,7 +91,7 @@ func TestRootContentNegotiation(t *testing.T) {
 			userAgent:   "Mozilla/5.0",
 			accept:      "text/html",
 			contentType: "text/plain",
-			contains:    []string{"PARROT-A"},
+			textFrames:  []string{"PARROT-A", "PARROT-B\n"},
 		},
 		{
 			name:        "generic client defaults to text",
@@ -97,7 +99,7 @@ func TestRootContentNegotiation(t *testing.T) {
 			userAgent:   "hello-test",
 			accept:      "*/*",
 			contentType: "text/plain",
-			contains:    []string{"PARROT-A"},
+			textFrames:  []string{"PARROT-A", "PARROT-B\n"},
 		},
 	}
 	for _, tc := range tests {
@@ -130,12 +132,47 @@ func TestRootContentNegotiation(t *testing.T) {
 					t.Errorf("response does not contain %q: %s", want, body)
 				}
 			}
+			if len(tc.textFrames) > 0 && !hasTextFramePrefix(body, tc.textFrames) {
+				t.Errorf("response does not start with a cached frame: %s", body)
+			}
 			for _, name := range []string{"X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy", "Permissions-Policy"} {
 				if response.Header.Get(name) == "" {
 					t.Errorf("security header %s is missing", name)
 				}
 			}
 		})
+	}
+}
+
+func TestTextFrameCacheIsDistinctAndImmutable(t *testing.T) {
+	frames := [][]byte{[]byte("FRAME-A"), []byte("FRAME-B\n"), []byte("FRAME-A")}
+	cached := cacheDistinctFrames(frames)
+	if len(cached) != 2 || cached[0] != "FRAME-A" || cached[1] != "FRAME-B\n" {
+		t.Fatalf("cached frames = %#v, want two distinct frames in source order", cached)
+	}
+
+	frames[0][0] = 'X'
+	if cached[0] != "FRAME-A" {
+		t.Fatalf("cached frame changed with source buffer: %q", cached[0])
+	}
+
+	for range 64 {
+		got := randomFrame(cached)
+		if got != "FRAME-A" && got != "FRAME-B\n" {
+			t.Fatalf("randomFrame returned uncached frame %q", got)
+		}
+	}
+	if got := randomFrame(nil); got != "" {
+		t.Fatalf("randomFrame(nil) = %q, want empty string", got)
+	}
+}
+
+func BenchmarkRandomCachedFrame(b *testing.B) {
+	cached := cacheDistinctFrames(smallInventory()["parrot"].Frames)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		_ = randomFrame(cached)
 	}
 }
 
@@ -196,7 +233,7 @@ func TestCustomAnimationAndMonoPage(t *testing.T) {
 	textRequest := httptest.NewRequest(http.MethodGet, "http://hello.example/?format=text", nil)
 	textRecorder := httptest.NewRecorder()
 	handler.ServeHTTP(textRecorder, textRequest)
-	if !strings.Contains(textRecorder.Body.String(), "CAT-A") || strings.Contains(textRecorder.Body.String(), "PARROT-A") {
+	if !hasTextFramePrefix(textRecorder.Body.Bytes(), []string{"CAT-A", "CAT-B"}) || strings.Contains(textRecorder.Body.String(), "PARROT-A") {
 		t.Errorf("custom text animation was not selected: %s", textRecorder.Body.String())
 	}
 
@@ -507,7 +544,7 @@ func TestEventsStreamsThroughUnwrapCapableWriter(t *testing.T) {
 
 func TestWriteTextResponseNewlineHandling(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://hello.example/", nil)
-	for _, frame := range [][]byte{nil, []byte("A"), []byte("A\n")} {
+	for _, frame := range []string{"", "A", "A\n"} {
 		var output bytes.Buffer
 		writeTextResponse(&output, req, "", frame)
 		if !strings.Contains(output.String(), "\n\nHello from") {
@@ -517,6 +554,20 @@ func TestWriteTextResponseNewlineHandling(t *testing.T) {
 			t.Errorf("empty version was rendered: %q", output.String())
 		}
 	}
+}
+
+func hasTextFramePrefix(body []byte, frames []string) bool {
+	for _, frame := range frames {
+		prefix := frame
+		if prefix == "" || prefix[len(prefix)-1] != '\n' {
+			prefix += "\n"
+		}
+		prefix += "\n"
+		if bytes.HasPrefix(body, []byte(prefix)) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestRunValidationListenFailureAndShutdown(t *testing.T) {

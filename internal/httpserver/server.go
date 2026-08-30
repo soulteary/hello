@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"math/rand/v2"
 	"mime"
 	"net"
 	"net/http"
@@ -171,6 +172,7 @@ func NewHandlerWithOptions(opts HandlerOptions) (http.Handler, error) {
 		version:    strings.TrimSpace(opts.Version),
 		name:       name,
 		animation:  anim,
+		textFrames: cacheDistinctFrames(anim.Frames),
 		frameDelay: opts.FrameDelay,
 		mono:       opts.Mono,
 	}
@@ -185,6 +187,7 @@ type handler struct {
 	version    string
 	name       string
 	animation  animation.Animation
+	textFrames []string
 	frameDelay time.Duration
 	mono       bool
 }
@@ -228,7 +231,7 @@ func (h handler) root(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	writeTextResponse(w, r, h.version, h.animation.Frames[0])
+	writeTextResponse(w, r, h.version, randomFrame(h.textFrames))
 }
 
 func (h handler) html(w http.ResponseWriter, r *http.Request) {
@@ -353,9 +356,33 @@ func acceptsHTML(accept string) bool {
 	return false
 }
 
-func writeTextResponse(w io.Writer, r *http.Request, version string, frame []byte) {
-	_, _ = w.Write(frame)
-	if len(frame) == 0 || frame[len(frame)-1] != '\n' {
+// cacheDistinctFrames detaches immutable text copies from the animation
+// buffers and removes duplicates so every visual frame has equal weight.
+func cacheDistinctFrames(frames [][]byte) []string {
+	cached := make([]string, 0, len(frames))
+	seen := make(map[string]struct{}, len(frames))
+	for _, frame := range frames {
+		text := string(frame)
+		if _, ok := seen[text]; ok {
+			continue
+		}
+		seen[text] = struct{}{}
+		cached = append(cached, text)
+	}
+	return cached
+}
+
+func randomFrame(frames []string) string {
+	if len(frames) == 0 {
+		return ""
+	}
+	// The package-level generator is safe for concurrent request handlers.
+	return frames[rand.IntN(len(frames))]
+}
+
+func writeTextResponse(w io.Writer, r *http.Request, version, frame string) {
+	_, _ = io.WriteString(w, frame)
+	if frame == "" || frame[len(frame)-1] != '\n' {
 		_, _ = io.WriteString(w, "\n")
 	}
 	_, _ = io.WriteString(w, "\n")
