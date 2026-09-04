@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-09-04
+
+### Changed
+
+- Pull requests that modify the release workflow now run its verification and
+  cross-platform build matrix without publishing artifacts.
+
+### Fixed
+
+- Release archive member checks use a materialized file list instead of
+  `tar`/`unzip` pipelines, preventing successful builds from failing under
+  `pipefail` when the downstream matcher exits early.
+- Language-switch links use canonical GitHub URLs so they remain valid when
+  READMEs are rendered outside the repository, including container registries.
+- Release and container workflows accept lightweight tags created through the
+  GitHub Release form while retaining SemVer, changelog and `main` ancestry
+  validation.
+
 ## [2.2.0] - 2026-09-04
 
 ### Added
@@ -48,16 +66,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Language-switch links use canonical GitHub URLs so they remain valid when
-  READMEs are rendered outside the repository, including container registries.
 - Query reflection now also controls `X-Forwarded-Uri`, preventing proxy
   headers containing sensitive query parameters from bypassing the default
   diagnostic redaction.
 - Release validation rejects numeric SemVer prerelease identifiers with
   leading zeroes, such as `v2.2.1-01`.
-- Release and container workflows accept lightweight tags created through the
-  GitHub Release form while retaining SemVer, changelog and `main` ancestry
-  validation.
 - Terminal rendering now propagates output and short-write failures instead of
   continuing an infinite animation after a pipe or output destination closes.
 - Release and container workflows now verify the artifacts they claim to
@@ -161,7 +174,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from plain-text diagnostics.
 - Third-party GitHub Actions are pinned to reviewed full commit SHAs.
 
-[Unreleased]: https://github.com/soulteary/hello/compare/v2.2.0...HEAD
-[2.2.0]: https://github.com/soulteary/hello/compare/v2.1.0...v2.2.0
+[Unreleased]: https://github.com/soulteary/hello/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/soulteary/hello/compare/03df0322798c81ddec4184af20704c663fbafd3a...v2.3.0
+[2.2.0]: https://github.com/soulteary/hello/compare/v2.1.0...03df0322798c81ddec4184af20704c663fbafd3a
 [2.1.0]: https://github.com/soulteary/hello/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/soulteary/hello/compare/v1.0.24...v2.0.0
