@@ -48,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Language-switch links use canonical GitHub URLs so they remain valid when
+  READMEs are rendered outside the repository, including container registries.
 - Query reflection now also controls `X-Forwarded-Uri`, preventing proxy
   headers containing sensitive query parameters from bypassing the default
   diagnostic redaction.

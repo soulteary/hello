@@ -12,7 +12,7 @@
 作为 `docker/hello-world` 的有趣替代品，也适合用于容器、反向代理、鉴权网关和
 健康检查演示。
 
-[English README](README.md)
+[English README](https://github.com/soulteary/hello/blob/main/README.md)
 
 ## 快速开始
 
