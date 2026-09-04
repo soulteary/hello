@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - 'v*'
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
   workflow_dispatch:
 
 permissions:
@@ -132,20 +135,20 @@ jobs:
           stem="hello_${VERSION}_${GOOS}_${GOARCH}"
           pushd dist >/dev/null
           if [[ "${GOOS}" == "windows" ]]; then
-            zip "${stem}.zip" "${bin}" LICENSE NOTICE
-            sha256sum "${stem}.zip" > "${stem}.zip.sha256"
-            unzip -l "${stem}.zip" | grep -Eq '[[:space:]]hello\.exe$'
-            unzip -l "${stem}.zip" | grep -Eq '[[:space:]]LICENSE$'
-            unzip -l "${stem}.zip" | grep -Eq '[[:space:]]NOTICE$'
+            archive="${stem}.zip"
+            zip "${archive}" "${bin}" LICENSE NOTICE
+            unzip -Z1 "${archive}" > "${stem}.contents"
           else
-            tar -czf "${stem}.tar.gz" "${bin}" LICENSE NOTICE
-            sha256sum "${stem}.tar.gz" > "${stem}.tar.gz.sha256"
-            tar -tzf "${stem}.tar.gz" | grep -Fxq hello
-            tar -tzf "${stem}.tar.gz" | grep -Fxq LICENSE
-            tar -tzf "${stem}.tar.gz" | grep -Fxq NOTICE
+            archive="${stem}.tar.gz"
+            tar -czf "${archive}" "${bin}" LICENSE NOTICE
+            tar -tzf "${archive}" > "${stem}.contents"
           fi
-          sha256sum -c "${stem}."*.sha256
-          rm -f "${bin}" LICENSE NOTICE
+          sha256sum "${archive}" > "${archive}.sha256"
+          for required in "${bin}" LICENSE NOTICE; do
+            grep -Fx -- "${required}" "${stem}.contents" >/dev/null
+          done
+          sha256sum -c "${archive}.sha256"
+          rm -f "${bin}" LICENSE NOTICE "${stem}.contents"
           popd >/dev/null
 
       - name: Smoke-test host binary
