@@ -76,10 +76,15 @@ func Run(opts Options) int {
 
 	if opts.List {
 		for _, name := range availableAnimations(inventory) {
+			var err error
 			if desc := inventory[name].Metadata["description"]; desc != "" {
-				fmt.Fprintf(opts.Stdout, "%s\t%s\n", name, desc)
+				_, err = fmt.Fprintf(opts.Stdout, "%s\t%s\n", name, desc)
 			} else {
-				fmt.Fprintln(opts.Stdout, name)
+				_, err = fmt.Fprintln(opts.Stdout, name)
+			}
+			if err != nil {
+				fmt.Fprintf(opts.Stderr, "write output: %v\n", err)
+				return 1
 			}
 		}
 		return 0
@@ -97,14 +102,25 @@ func Run(opts Options) int {
 	stop, cleanup := installSignalHandler()
 	defer cleanup()
 
-	renderer.Begin()
-	defer renderer.End()
+	if err := renderer.Begin(); err != nil {
+		fmt.Fprintf(opts.Stderr, "write output: %v\n", err)
+		return 1
+	}
 
-	runLoop(renderer, anim, loopOptions{
+	runErr := runLoop(renderer, anim, loopOptions{
 		loops:      opts.Loops,
 		frameDelay: opts.Delay,
 		stop:       stop,
 	})
+	endErr := renderer.End()
+	if runErr != nil {
+		fmt.Fprintf(opts.Stderr, "write output: %v\n", runErr)
+		return 1
+	}
+	if endErr != nil {
+		fmt.Fprintf(opts.Stderr, "write output: %v\n", endErr)
+		return 1
+	}
 	return 0
 }
 
@@ -172,7 +188,7 @@ type loopOptions struct {
 // channel plus a cleanup func. It is intentionally split from runLoop so the
 // signal subscription happens *before* the renderer hides the cursor — that
 // way Ctrl+C during the tiny window before runLoop starts still triggers the
-// deferred renderer.End() in main and the terminal cursor is restored.
+// renderer.End() cleanup in Run and the terminal cursor is restored.
 func installSignalHandler() (<-chan os.Signal, func()) {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
@@ -183,10 +199,10 @@ func installSignalHandler() (<-chan os.Signal, func()) {
 // advances the rainbow color on each tick, and exits cleanly when opts.stop
 // fires (or when the configured number of loops is reached). Returning from
 // this function signals the caller to tear the renderer down.
-func runLoop(renderer *render.Renderer, anim animation.Animation, opts loopOptions) {
+func runLoop(renderer *render.Renderer, anim animation.Animation, opts loopOptions) error {
 	frames := len(anim.Frames)
 	if frames == 0 {
-		return
+		return nil
 	}
 
 	ticker := time.NewTicker(opts.frameDelay)
@@ -194,32 +210,36 @@ func runLoop(renderer *render.Renderer, anim animation.Animation, opts loopOptio
 
 	drawnInLoop := 0
 	remainingLoops := opts.loops
-	draw := func() bool {
-		renderer.Draw(anim)
+	draw := func() (bool, error) {
+		if err := renderer.Draw(anim); err != nil {
+			return false, err
+		}
 		renderer.AdvanceColor()
 		drawnInLoop++
 		if drawnInLoop < frames {
-			return false
+			return false, nil
 		}
 		drawnInLoop = 0
 		if remainingLoops > 0 {
 			remainingLoops--
-			return remainingLoops == 0
+			return remainingLoops == 0, nil
 		}
-		return false
+		return false, nil
 	}
 
-	if draw() {
-		return
+	done, err := draw()
+	if err != nil || done {
+		return err
 	}
 
 	for {
 		select {
 		case <-opts.stop:
-			return
+			return nil
 		case <-ticker.C:
-			if draw() {
-				return
+			done, err := draw()
+			if err != nil || done {
+				return err
 			}
 		}
 	}

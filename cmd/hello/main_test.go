@@ -76,6 +76,7 @@ func TestRunValidatesArguments(t *testing.T) {
 		{name: "bad integer", args: []string{"-delay", "nope"}, want: "invalid value"},
 		{name: "listen with list", args: []string{"-listen", ":8080", "-list"}, want: "cannot be combined with list"},
 		{name: "listen with loops", args: []string{"-listen", ":8080", "-loops", "1"}, want: "cannot be combined with loops"},
+		{name: "invalid stream limit", args: []string{"-listen", ":8080", "-http-max-streams", "0"}, want: "http-max-streams must be > 0"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -125,7 +126,7 @@ func TestRunDispatchesHTTPMode(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	var got httpserver.Options
 	code := runWithServer(
-		[]string{"-listen", " 127.0.0.1:9090 ", "-a", "cat", "-delay", "120", "-mono"},
+		[]string{"-listen", " 127.0.0.1:9090 ", "-a", "cat", "-delay", "120", "-mono", "-http-max-streams", "7", "-reflect-query", "-reflect-identity", "-reflect-hostname=false"},
 		&stdout,
 		&stderr,
 		func(ctx context.Context, opts httpserver.Options) error {
@@ -141,6 +142,9 @@ func TestRunDispatchesHTTPMode(t *testing.T) {
 	}
 	if got.Addr != "127.0.0.1:9090" || got.Animation != "cat" || got.FrameDelay != 120*time.Millisecond || !got.Mono {
 		t.Errorf("unexpected HTTP options: %+v", got)
+	}
+	if got.MaxStreams != 7 || !got.ReflectQuery || !got.ReflectIdentity || got.ReflectHostname {
+		t.Errorf("unexpected HTTP diagnostic options: %+v", got)
 	}
 	if got.Stdout != &stdout {
 		t.Error("HTTP stdout was not forwarded")

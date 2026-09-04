@@ -1,8 +1,8 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 
 # ---------- build stage ----------
 # Pin a Go version that matches go.mod's `go 1.27.0` directive.
-FROM --platform=$BUILDPLATFORM golang:1.27.0-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.0-alpine@sha256:4c9fe60190a2a3350ddc51de80d0224b8a6698d12bdfc999fee45ea9d6c46dbc AS build
 
 # TARGETOS/TARGETARCH are provided by buildx for multi-arch builds.
 ARG TARGETOS
@@ -36,7 +36,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # distroless/static:nonroot is a tiny (~2 MB) base that ships CA certs, tzdata
 # and a non-root user (uid/gid 65532). The binary is fully static (CGO off),
 # so `static` is sufficient and the image runs unprivileged out of the box.
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 
 ARG VERSION=dev
 ARG REVISION=unknown

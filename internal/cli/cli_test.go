@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"reflect"
 	"strings"
@@ -107,6 +108,37 @@ func Test_RunListUnknownAndSuccess(t *testing.T) {
 	}
 }
 
+func Test_RunStopsOnOutputFailure(t *testing.T) {
+	want := errors.New("closed pipe")
+	stderr := &bytes.Buffer{}
+	if code := Run(Options{
+		Loops:  1,
+		Delay:  time.Millisecond,
+		Mono:   true,
+		Stdout: failingWriter{err: want},
+		Stderr: stderr,
+	}); code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "write output: closed pipe") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+
+	stderr.Reset()
+	if code := Run(Options{
+		List:   true,
+		Delay:  time.Millisecond,
+		Stdout: failingWriter{err: want},
+		Stderr: stderr,
+	}); code != 1 {
+		t.Fatalf("list exit code = %d, want 1", code)
+	}
+}
+
+type failingWriter struct{ err error }
+
+func (w failingWriter) Write([]byte) (int, error) { return 0, w.err }
+
 func Test_PickAnimationName(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -174,10 +206,12 @@ func Test_RunLoop_DrawsExactlyLoopsTimesFrames(t *testing.T) {
 			var buf bytes.Buffer
 			r := render.NewRenderer(&buf, true)
 
-			runLoop(r, anim, loopOptions{
+			if err := runLoop(r, anim, loopOptions{
 				loops:      tc.loops,
 				frameDelay: time.Millisecond,
-			})
+			}); err != nil {
+				t.Fatal(err)
+			}
 
 			want := tc.loops * tc.frames
 			// FrameIndex wraps; we infer total draws from byte count instead:
@@ -193,7 +227,9 @@ func Test_RunLoop_DrawsExactlyLoopsTimesFrames(t *testing.T) {
 func Test_RunLoop_EmptyAnimationReturnsImmediately(t *testing.T) {
 	var buf bytes.Buffer
 	r := render.NewRenderer(&buf, true)
-	runLoop(r, animation.Animation{}, loopOptions{loops: 1, frameDelay: time.Millisecond})
+	if err := runLoop(r, animation.Animation{}, loopOptions{loops: 1, frameDelay: time.Millisecond}); err != nil {
+		t.Fatal(err)
+	}
 	if buf.Len() != 0 {
 		t.Errorf("expected no output, got %q", buf.String())
 	}
@@ -212,11 +248,13 @@ func Test_RunLoop_StopChannelInterrupts(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		runLoop(r, anim, loopOptions{
+		if err := runLoop(r, anim, loopOptions{
 			loops:      0,
 			frameDelay: 10 * time.Millisecond,
 			stop:       stop,
-		})
+		}); err != nil {
+			t.Errorf("runLoop: %v", err)
+		}
 		close(done)
 	}()
 

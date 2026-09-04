@@ -48,6 +48,13 @@ custom reflected header, rename it to a documented non-secret field or inspect
 it at the proxy instead. Do not add token or authorization fields to the
 allowlist.
 
+Starting with 2.2, identity-bearing allowlisted headers and the URL query
+string are hidden by default. Use `-reflect-identity` or `-reflect-query` only
+when that echo behavior is required in a controlled environment. The command
+server continues to show the runtime hostname by default; use
+`-reflect-hostname=false` to hide it. A trusted proxy must strip client-supplied
+identity headers before adding its own values.
+
 ### HTTP flags
 
 `-animation`, `-delay` and `-mono` now configure HTTP output as well as terminal
@@ -70,6 +77,7 @@ silently ignored additional positional arguments; version 2.0 exits with code
 hello sends `Cache-Control: no-store, no-transform` and
 `X-Accel-Buffering: no`, but proxy configuration remains authoritative.
 `/healthz` should be used for health checks rather than `/events`.
+Ready-to-copy examples are in [`deployment.md`](deployment.md).
 
 ### Packaging and CI
 
@@ -120,6 +128,11 @@ are built.
 中列出的明确身份与路由请求头白名单。如果演示依赖自定义回显字段，请改用已有
 的非敏感字段，或直接在代理层检查；不要把令牌、授权字段加入白名单。
 
+从 2.2 开始，允许列表内的身份头和 URL 查询参数默认也不会回显。只有在受控环境
+确实需要该行为时，才启用 `-reflect-identity` 或 `-reflect-query`。命令行 HTTP
+服务仍默认显示运行时主机名，可用 `-reflect-hostname=false` 关闭。可信代理必须
+先移除客户端自行提交的身份头，再写入自己的值。
+
 ### HTTP 参数
 
 `-animation`、`-delay`、`-mono` 现在同时配置 HTTP 输出与终端播放。
@@ -141,6 +154,7 @@ are built.
 hello 会发送 `Cache-Control: no-store, no-transform` 与
 `X-Accel-Buffering: no`，但最终仍以代理配置为准。健康检查应使用 `/healthz`，
 不要连接 `/events`。
+可直接使用的配置示例见 [`deployment.md`](deployment.md)。
 
 ### 打包与 CI
 

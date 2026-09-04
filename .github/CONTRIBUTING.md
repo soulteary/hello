@@ -31,8 +31,9 @@ make vuln    # scan reachable code and dependencies
 
 New behavior needs tests at the narrowest useful level. HTTP changes should
 cover content type, status/method contracts, security headers, cancellation and
-streaming errors where relevant. Do not weaken `COVERAGE_MIN` to make a change
-pass.
+streaming errors where relevant. Terminal rendering changes must cover output
+failures as well as successful buffers. Do not weaken `COVERAGE_MIN` to make a
+change pass.
 
 ## Commit messages
 
@@ -63,7 +64,9 @@ only a response recorder, so flush and cancellation behavior are covered.
 
 Changes that alter a documented HTTP body, endpoint, flag interaction or
 header allowlist must update both READMEs, `docs/CHANGELOG.md` and the migration
-guide when compatibility is affected.
+guide when compatibility is affected. Deployment-facing changes should also
+update `docs/deployment.md`; signing or packaging changes should update
+`docs/verification.md`.
 
 ## Releases
 

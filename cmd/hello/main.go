@@ -73,6 +73,10 @@ func runWithServer(args []string, stdout, stderr io.Writer, serve serverRunner) 
 	delay := fs.Int("delay", 75, "terminal/SSE frame delay in ms (1-60000)")
 	list := fs.Bool("list", false, "list available animations and exit")
 	listen := fs.String("listen", "", "serve HTTP on this address instead of playing an animation (for example, :8080)")
+	maxStreams := fs.Int("http-max-streams", 64, "maximum concurrent SSE streams (unavailable without -listen)")
+	reflectQuery := fs.Bool("reflect-query", false, "include the raw URL query in text diagnostics (unavailable without -listen)")
+	reflectIdentity := fs.Bool("reflect-identity", false, "include allowlisted identity headers in text diagnostics (unavailable without -listen)")
+	reflectHostname := fs.Bool("reflect-hostname", true, "include the container hostname in text diagnostics (unavailable without -listen)")
 	showVersion := fs.Bool("version", false, "print version and exit")
 
 	var animationFlag string
@@ -124,15 +128,23 @@ func runWithServer(args []string, stdout, stderr io.Writer, serve serverRunner) 
 			fmt.Fprintln(stderr, "listen cannot be combined with loops")
 			return 2
 		}
+		if *maxStreams <= 0 {
+			fmt.Fprintln(stderr, "http-max-streams must be > 0")
+			return 2
+		}
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 		if err := serve(ctx, httpserver.Options{
-			Addr:       addr,
-			Version:    currentVersion(),
-			Animation:  animationName,
-			FrameDelay: time.Duration(*delay) * time.Millisecond,
-			Mono:       *mono,
-			Stdout:     stdout,
+			Addr:            addr,
+			Version:         currentVersion(),
+			Animation:       animationName,
+			FrameDelay:      time.Duration(*delay) * time.Millisecond,
+			Mono:            *mono,
+			MaxStreams:      *maxStreams,
+			ReflectQuery:    *reflectQuery,
+			ReflectIdentity: *reflectIdentity,
+			ReflectHostname: *reflectHostname,
+			Stdout:          stdout,
 		}); err != nil {
 			fmt.Fprintf(stderr, "HTTP server: %v\n", err)
 			return 1
