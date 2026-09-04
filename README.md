@@ -13,7 +13,7 @@ Parrot. It is a playful alternative to `docker/hello-world` and a useful
 backend for container, reverse-proxy, authentication-gateway and health-check
 demos.
 
-[中文文档](README.zh-CN.md)
+[中文文档](https://github.com/soulteary/hello/blob/main/README.zh-CN.md)
 
 ## Quick start
 

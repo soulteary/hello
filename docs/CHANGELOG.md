@@ -7,19 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- The race-enabled statement-coverage floor is now 100% for local checks,
-  pull requests and tagged releases.
-
-### Fixed
-
-- Query reflection now also controls `X-Forwarded-Uri`, preventing proxy
-  headers containing sensitive query parameters from bypassing the default
-  diagnostic redaction.
-- Release validation rejects numeric SemVer prerelease identifiers with
-  leading zeroes, such as `v2.2.1-01`.
-
 ## [2.2.0] - 2026-09-04
 
 ### Added
@@ -42,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The race-enabled statement-coverage floor is now 100% for local checks,
+  pull requests and tagged releases.
 - URL query strings and identity-bearing proxy headers are no longer reflected
   by default. Operators can enable them explicitly when the echo behavior is
   required in a controlled test environment.
@@ -50,9 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker pull-request and manual runs build without registry write or OIDC
   permissions; only push-triggered publish jobs receive those permissions.
 - Manual Docker workflow runs no longer publish images. Release tags must be
-  valid SemVer, point to a commit contained in `main`, use an annotated or
-  signed tag object, and have a dated changelog section before images or
-  archives are published.
+  valid SemVer, point to a commit contained in `main`, and have a dated
+  changelog section before images or archives are published.
 - Go Report Card updates no longer use a commit-message marker that suppresses
   push-triggered release workflows.
 - The Dockerfile frontend, Go builder and distroless runtime images are pinned
@@ -60,6 +48,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Language-switch links use canonical GitHub URLs so they remain valid when
+  READMEs are rendered outside the repository, including container registries.
+- Query reflection now also controls `X-Forwarded-Uri`, preventing proxy
+  headers containing sensitive query parameters from bypassing the default
+  diagnostic redaction.
+- Release validation rejects numeric SemVer prerelease identifiers with
+  leading zeroes, such as `v2.2.1-01`.
+- Release and container workflows accept lightweight tags created through the
+  GitHub Release form while retaining SemVer, changelog and `main` ancestry
+  validation.
 - Terminal rendering now propagates output and short-write failures instead of
   continuing an infinite animation after a pipe or output destination closes.
 - Release and container workflows now verify the artifacts they claim to

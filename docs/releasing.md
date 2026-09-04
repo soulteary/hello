@@ -60,7 +60,8 @@ message contains `[skip ci]`, `[ci skip]`, `[no ci]`, `[skip actions]`,
 `[actions skip]` or a `skip-checks` trailer: tag pushes are `push` events and
 those markers can suppress both delivery workflows.
 
-Create an annotated or signed tag on that exact commit:
+Create a release tag on that exact commit. A signed tag is preferred when the
+maintainer has a signing identity configured:
 
 ```bash
 VERSION=2.2.0
@@ -71,10 +72,12 @@ git tag -s "v${VERSION}" -m "hello v${VERSION}"
 git push origin "v${VERSION}"
 ```
 
-Use `git tag -a` when signing is unavailable. Lightweight release tags are
-rejected. Do not create the tag through a GitHub Release form, move it or reuse
-it after publication. If a release has a defect, document it on that release
-and prepare a new patch version.
+Use `git tag -a` when signing is unavailable. Lightweight tags created with
+`git tag "v${VERSION}"` or through the GitHub Release form are also accepted;
+the workflows still require strict SemVer, a matching dated changelog section
+and a target commit contained in `main`. Do not move or reuse a tag after
+publication. If a release has a defect, document it on that release and prepare
+a new patch version.
 
 Repository administrators should also protect `v*` with a tag ruleset that
 restricts updates and deletions, and enable release immutability. These settings
