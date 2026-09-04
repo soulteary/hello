@@ -10,7 +10,7 @@ Download `checksums.txt` and the archive for the same version, then verify it
 before extracting:
 
 ```bash
-VERSION=2.2.0
+VERSION=2.3.0
 ASSET="hello_${VERSION}_linux_amd64.tar.gz"
 BASE="https://github.com/soulteary/hello/releases/download/v${VERSION}"
 
@@ -38,7 +38,7 @@ then verify either registry. Replace the version with the exact tag being
 deployed:
 
 ```bash
-IMAGE=ghcr.io/soulteary/hello:2.2.0
+IMAGE=ghcr.io/soulteary/hello:2.3.0
 
 cosign verify \
   --certificate-identity-regexp '^https://github.com/soulteary/hello/.github/workflows/docker.yml@refs/tags/v.*$' \
@@ -46,7 +46,7 @@ cosign verify \
   "${IMAGE}"
 ```
 
-The Docker Hub equivalent is `soulteary/hello:2.2.0`. Verification constrains
+The Docker Hub equivalent is `soulteary/hello:2.3.0`. Verification constrains
 the signer to this repository's Docker workflow and GitHub Actions' OIDC
 issuer; a signature from an unrelated workflow is not accepted.
 

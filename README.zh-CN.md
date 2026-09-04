@@ -36,7 +36,7 @@ docker run --rm -it ghcr.io/soulteary/hello
 ```
 
 需要可重复部署时，应固定完整版本，例如
-`ghcr.io/soulteary/hello:2.2.0`，或直接固定不可变 digest。`latest` 跟随最近一次
+`ghcr.io/soulteary/hello:2.3.0`，或直接固定不可变 digest。`latest` 跟随最近一次
 正式发布，`main` 跟随默认分支。完整示例见[部署指南](docs/deployment.md)和
 [校验指南](docs/verification.md)。
 
@@ -199,7 +199,7 @@ stderr 输出明确原因，并以非零状态码退出。
 go install github.com/soulteary/hello/cmd/hello@latest
 ```
 
-需要可重复安装时，应固定为 `@v2.2.0`，而不是使用 `@latest`。
+需要可重复安装时，应固定为 `@v2.3.0`，而不是使用 `@latest`。
 
 从 `v2.0.0` 开始，正式版本包含 SHA-256 校验文件，以及以下预编译二进制：
 

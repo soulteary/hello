@@ -11,12 +11,12 @@ Hub and GitHub Container Registry:
 
 | Tag | Meaning |
 | --- | --- |
-| `2.2.0` | Immutable release version; preferred for deployments. |
+| `2.3.0` | Immutable release version; preferred for deployments. |
 | `2.2` / `2` | Moving minor and major aliases. |
 | `latest` | Most recently published release. |
 | `main` | Latest successful build from the default branch. |
 
-Use `ghcr.io/soulteary/hello:2.2.0` or `soulteary/hello:2.2.0`. See
+Use `ghcr.io/soulteary/hello:2.3.0` or `soulteary/hello:2.3.0`. See
 [`verification.md`](verification.md) before promoting a new version.
 
 ## Docker Compose
@@ -24,7 +24,7 @@ Use `ghcr.io/soulteary/hello:2.2.0` or `soulteary/hello:2.2.0`. See
 ```yaml
 services:
   hello:
-    image: ghcr.io/soulteary/hello:2.2.0
+    image: ghcr.io/soulteary/hello:2.3.0
     command: ["-listen", ":8080", "-http-max-streams", "64"]
     ports:
       - "127.0.0.1:8080:8080"
@@ -74,7 +74,7 @@ response aggregation for this route if an outer proxy still buffers events.
 ```yaml
 services:
   hello:
-    image: ghcr.io/soulteary/hello:2.2.0
+    image: ghcr.io/soulteary/hello:2.3.0
     command: ["-listen", ":8080"]
     labels:
       - traefik.enable=true
@@ -105,7 +105,7 @@ spec:
     spec:
       containers:
         - name: hello
-          image: ghcr.io/soulteary/hello:2.2.0
+          image: ghcr.io/soulteary/hello:2.3.0
           args: ["-listen", ":8080", "-http-max-streams", "64"]
           ports:
             - {name: http, containerPort: 8080}

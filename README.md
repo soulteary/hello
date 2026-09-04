@@ -38,7 +38,7 @@ docker run --rm -it ghcr.io/soulteary/hello
 ```
 
 For repeatable deployments, pin a complete release such as
-`ghcr.io/soulteary/hello:2.2.0` or an immutable digest. `latest` follows the
+`ghcr.io/soulteary/hello:2.3.0` or an immutable digest. `latest` follows the
 most recent release and `main` follows the default branch. See the
 [deployment recipes](docs/deployment.md) and [verification guide](docs/verification.md).
 
@@ -214,7 +214,7 @@ Install from source with the Go version declared in [`go.mod`](go.mod):
 go install github.com/soulteary/hello/cmd/hello@latest
 ```
 
-Pin `@v2.2.0` instead of `@latest` when a reproducible tool installation is
+Pin `@v2.3.0` instead of `@latest` when a reproducible tool installation is
 required.
 
 Starting with `v2.0.0`, tagged releases include SHA-256 checksums and binaries

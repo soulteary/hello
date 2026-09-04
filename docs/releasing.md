@@ -64,7 +64,7 @@ Create a release tag on that exact commit. A signed tag is preferred when the
 maintainer has a signing identity configured:
 
 ```bash
-VERSION=2.2.0
+VERSION=2.3.0
 git switch main
 git pull --ff-only origin main
 git log -1 --show-signature
