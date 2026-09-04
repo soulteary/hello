@@ -41,14 +41,14 @@ func NewRenderer(out io.Writer, mono bool) *Renderer {
 
 // Begin hides the cursor, clears the screen and homes the cursor. It should
 // be called once before the first Draw.
-func (r *Renderer) Begin() {
-	fmt.Fprint(r.out, ansiHideCursor+ansiClear+ansiHome)
+func (r *Renderer) Begin() error {
+	return writeAll(r.out, []byte(ansiHideCursor+ansiClear+ansiHome))
 }
 
 // End restores the cursor and resets attributes. Safe to call from a defer
 // even if Begin was never executed.
-func (r *Renderer) End() {
-	fmt.Fprint(r.out, ansiShowCursor+ansiReset+"\n")
+func (r *Renderer) End() error {
+	return writeAll(r.out, []byte(ansiShowCursor+ansiReset+"\n"))
 }
 
 // Draw renders the next frame of animation to the writer. The frame is
@@ -56,9 +56,9 @@ func (r *Renderer) End() {
 // and the cursor is advanced after a successful write. In color mode the
 // active palette entry wraps around the cursor on every line; the caller is
 // responsible for invoking AdvanceColor on the desired cadence.
-func (r *Renderer) Draw(anim animation.Animation) {
+func (r *Renderer) Draw(anim animation.Animation) error {
 	if len(anim.Frames) == 0 {
-		return
+		return nil
 	}
 	idx := r.frameIdx % len(anim.Frames)
 	if idx < 0 {
@@ -90,11 +90,25 @@ func (r *Renderer) Draw(anim animation.Animation) {
 		}
 	}
 
-	_, _ = r.out.Write(buf.Bytes())
+	if err := writeAll(r.out, buf.Bytes()); err != nil {
+		return err
+	}
 	r.frameIdx++
 	if r.frameIdx >= len(anim.Frames) {
 		r.frameIdx = 0
 	}
+	return nil
+}
+
+func writeAll(w io.Writer, data []byte) error {
+	written, err := w.Write(data)
+	if err != nil {
+		return err
+	}
+	if written != len(data) {
+		return io.ErrShortWrite
+	}
+	return nil
 }
 
 // AdvanceColor moves to the next palette entry. No-op when mono is true.

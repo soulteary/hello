@@ -8,15 +8,15 @@ This checklist is for project maintainers. A release is created only from a
 1. Start from an up-to-date `main` with a clean working tree.
 2. Move completed entries from `Unreleased` into a dated version section in
    [`CHANGELOG.md`](CHANGELOG.md). The heading must use the exact form
-   `## [2.0.0] - YYYY-MM-DD`; the release workflow extracts that section.
+   `## [X.Y.Z] - YYYY-MM-DD`; the release workflow extracts that section.
 3. Check that both READMEs, the migration guide, animation reference,
    `LICENSE` and `NOTICE` match the code and packaged assets.
 4. Confirm the Go version in `go.mod`, the Docker build stage and CI setup are
    aligned.
 
-For 2.0.0, review [`migration-v2.md`](migration-v2.md) as part of the release
-PR because the HTTP root response is intentionally incompatible with 1.x body
-parsers.
+For a major-version release, add or update the corresponding migration guide.
+For a patch or minor release, call out any intentionally changed defaults in
+the changelog and both READMEs.
 
 ## 2. Run the local gates
 
@@ -55,17 +55,31 @@ more than ten seconds; this catches proxy or server write-timeout regressions.
 ## 3. Merge and tag
 
 Wait for the release-preparation PR and all required checks to pass. Merge it,
-update local `main`, and create an annotated or signed tag on that exact commit:
+update local `main`, and choose the version once. Never tag a commit whose
+message contains `[skip ci]`, `[ci skip]`, `[no ci]`, `[skip actions]`,
+`[actions skip]` or a `skip-checks` trailer: tag pushes are `push` events and
+those markers can suppress both delivery workflows.
+
+Create an annotated or signed tag on that exact commit:
 
 ```bash
+VERSION=2.2.0
 git switch main
 git pull --ff-only origin main
-git tag -s v2.0.0 -m "hello v2.0.0"
-git push origin v2.0.0
+git log -1 --show-signature
+git tag -s "v${VERSION}" -m "hello v${VERSION}"
+git push origin "v${VERSION}"
 ```
 
-Do not move or reuse a published version tag. If a release has a defect,
-prepare a new patch version.
+Use `git tag -a` when signing is unavailable. Lightweight release tags are
+rejected. Do not create the tag through a GitHub Release form, move it or reuse
+it after publication. If a release has a defect, document it on that release
+and prepare a new patch version.
+
+Repository administrators should also protect `v*` with a tag ruleset that
+restricts updates and deletions, and enable release immutability. These settings
+apply outside Actions and prevent an administrator or compromised credential
+from replacing an already published tag or asset.
 
 ## 4. Verify automation
 
@@ -84,14 +98,17 @@ Confirm all jobs are green, then inspect the published result:
 - Linux amd64/arm64, macOS amd64/arm64 and Windows amd64/arm64 archives exist;
 - every archive contains the binary, `LICENSE` and `NOTICE`;
 - `checksums.txt` covers every archive and verifies locally;
-- image tags include `2.0.0`, `2.0`, `2` and the expected registry names;
+- image tags include `${VERSION}`, its minor and major aliases, and the expected
+  registry names;
 - the version-tag build, rather than an earlier `main` build, updates `latest`;
-- `hello -version` reports `2.0.0` in both a downloaded binary and container;
+- `hello -version` reports `${VERSION}` in both a downloaded binary and
+  container;
 - curl, browser animation, `/events` and `/healthz` work from the published
   image.
 
 ## 5. Post-release
 
 Add an empty `Unreleased` section for subsequent work if needed. Update any
-downstream examples that pin the old image only after the immutable 2.0.0 tag
-and both registries have been verified.
+downstream examples that pin the old image only after the immutable tag and
+both registries have been verified. Follow the checksum and signature commands
+in [`verification.md`](verification.md) from a clean machine.

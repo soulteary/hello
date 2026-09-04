@@ -21,4 +21,5 @@ jobs:
           directory: "."
           output: ".github/goreportcard.svg"
           commit: "true"
+          commit_message: "chore: update Go Report Card badge"
       - run: echo "Grade ${{ steps.grc.outputs.grade }} (${{ steps.grc.outputs.score }}%)"

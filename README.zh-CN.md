@@ -35,6 +35,11 @@ docker run --rm -it soulteary/hello
 docker run --rm -it ghcr.io/soulteary/hello
 ```
 
+需要可重复部署时，应固定完整版本，例如
+`ghcr.io/soulteary/hello:2.2.0`，或直接固定不可变 digest。`latest` 跟随最近一次
+正式发布，`main` 跟随默认分支。完整示例见[部署指南](docs/deployment.md)和
+[校验指南](docs/verification.md)。
+
 ## HTTP 模式
 
 显式启动内置 HTTP 服务：
@@ -83,6 +88,17 @@ event: frame
 data: {"animation":"parrot","color":"#ff8787","frame":"...","index":0}
 ```
 
+完整事件还包含递增的 `id`、一秒重连提示；服务端每 15 秒发送一次注释心跳：
+
+```text
+id: 0
+event: frame
+retry: 1000
+data: {"animation":"parrot","color":"#ff8787","frame":"...","index":0}
+
+: keepalive
+```
+
 这里的 SSE 是建立在普通长连接 HTTP 响应之上的应用层 Server Push。项目没有
 采用 HTTP/2 Resource Push，因为现代浏览器已经不再将它作为通用页面资源推送
 机制支持。
@@ -100,6 +116,7 @@ docker run --rm -p 8080:8080 ghcr.io/soulteary/hello \
 - `-animation` / `-a` 决定终端客户端和浏览器动画使用的帧集合。
 - `-delay` 决定 SSE 推送帧间隔。
 - `-mono` 关闭浏览器颜色循环。
+- `-http-max-streams` 限制并发 SSE 客户端，默认值为 `64`。
 - `-loops`、`-list` 不能与 `-listen` 组合使用。
 
 服务设置了请求和请求头超时，并支持 `SIGINT` / `SIGTERM` 优雅退出。SSE 每次
@@ -107,12 +124,16 @@ docker run --rm -p 8080:8080 ghcr.io/soulteary/hello \
 存在反向代理，需要为该路径关闭响应缓冲；hello 同时会发送兼容代理可识别的
 `X-Accel-Buffering: no`。
 
+全部流槽位占满时，新的 `/events` 请求会得到 `503 Service Unavailable` 和
+`Retry-After: 1`，但 `/healthz` 不受影响。浏览器页面在隐藏时会主动断开 SSE，
+提供暂停/继续按钮，并在系统偏好“减少动态效果”时默认保持暂停。
+
 ### 请求信息回显范围
 
-文本响应包含方法、URL、Host、容器主机名和版本。问候语与版本之间保留一个
+文本响应包含方法、URL 路径、Host、容器主机名和版本。问候语与版本之间保留一个
 空行，最后一行固定为 `Project: https://github.com/soulteary/hello`。根路径响应
-（包括 `HEAD`）还会在 `Project` 响应头中提供同一地址。诊断正文仅回显以下明确
-允许的路由或身份请求头：
+（包括 `HEAD`）还会在 `Project` 响应头中提供同一地址。根据显式诊断参数，正文
+只能输出以下允许列表内的路由或身份请求头：
 
 - `Forwarded`、`User-Agent`、`X-Real-IP`
 - `X-Forwarded-For`、`X-Forwarded-Host`、`X-Forwarded-Method`、
@@ -123,7 +144,11 @@ docker run --rm -p 8080:8080 ghcr.io/soulteary/hello \
 
 凭据类或未识别的请求头不会回显，包括 `Authorization`、
 `Proxy-Authorization`、`Cookie`、`X-Auth-Token` 和
-`X-Forwarded-Access-Token`。
+`X-Forwarded-Access-Token`。默认也不会输出 `X-Forwarded-User`、允许列表内的
+`X-Auth-*` 身份字段或 URL 查询参数。仅应在受控测试环境中启用
+`-reflect-identity` 或 `-reflect-query`。不希望暴露基础设施标识时，可使用
+`-reflect-hostname=false` 关闭默认主机名输出。反向代理必须先清除客户端自行
+提交的身份头，再写入可信值。
 
 ## 内置动画
 
@@ -156,6 +181,10 @@ docker run --rm soulteary/hello -list
 | `-mono` | 关闭彩虹色。 | `false` |
 | `-list` | 列出内置动画并退出。 | `false` |
 | `-listen` | 监听 HTTP，而不是进入终端播放循环。 | `""` |
+| `-http-max-streams` | HTTP 模式允许的最大并发 SSE 客户端数。 | `64` |
+| `-reflect-query` | 在文本诊断中输出原始 URL 查询参数。 | `false` |
+| `-reflect-identity` | 在文本诊断中输出允许列表内的身份头。 | `false` |
+| `-reflect-hostname` | 在文本诊断中输出运行时主机名。 | `true` |
 | `-version` | 打印构建版本并退出。 | `false` |
 | `-h`、`-help` | 打印使用说明并退出。 | `false` |
 
@@ -170,6 +199,8 @@ stderr 输出明确原因，并以非零状态码退出。
 go install github.com/soulteary/hello/cmd/hello@latest
 ```
 
+需要可重复安装时，应固定为 `@v2.2.0`，而不是使用 `@latest`。
+
 从 `v2.0.0` 开始，正式版本包含 SHA-256 校验文件，以及以下预编译二进制：
 
 - Linux：amd64、arm64
@@ -178,6 +209,10 @@ go install github.com/soulteary/hello/cmd/hello@latest
 
 发布压缩包会同时包含 `LICENSE` 和 `NOTICE`。容器镜像使用非 root 用户运行在
 distroless 基础镜像中，并在 `/usr/share/licenses/hello/` 保留相同文件。
+
+已经发布的 `v2.1.0` GitHub Release 不完整，没有可下载的二进制压缩包。后续完整
+版本发布前，请使用 `v2.0.0` 预编译产物；该事件已记录在
+[变更记录](docs/CHANGELOG.md)中。
 
 ## 终端兼容性
 
@@ -221,13 +256,16 @@ make cover COVERAGE_MIN=95
 ```
 
 CI 会检查模块整洁性、格式、`go vet`、govulncheck、golangci-lint、竞态测试和
-覆盖率门槛；CodeQL 在 push、PR 和每周定时任务中执行。第三方 GitHub Actions
-均固定到完整 Commit SHA。
+覆盖率门槛，还会实际启动构建出的容器，检查非 root 用户、OCI 元数据、HTTP
+行为和默认诊断脱敏。标签发布会在上传前校验压缩包内容、checksum 和可执行文件
+版本。CodeQL 在 push、PR 和每周定时任务中执行。第三方 GitHub Actions 均固定
+到完整 Commit SHA。
 
 贡献流程见 [CONTRIBUTING.md](.github/CONTRIBUTING.md)，私密安全问题报告方式见
 [SECURITY.md](.github/SECURITY.md)，HTTP 兼容性变化见
-[v2 迁移指南](docs/migration-v2.md)。维护者在创建 `v2.0.0` 或后续版本标签前，
-应执行[发布指南](docs/releasing.md)。
+[v2 迁移指南](docs/migration-v2.md)，代理和 Kubernetes 示例见
+[部署指南](docs/deployment.md)。维护者在创建任何版本标签前，应执行
+[发布指南](docs/releasing.md)。
 
 ## 致谢与许可证
 

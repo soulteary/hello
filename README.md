@@ -37,6 +37,11 @@ docker run --rm -it soulteary/hello
 docker run --rm -it ghcr.io/soulteary/hello
 ```
 
+For repeatable deployments, pin a complete release such as
+`ghcr.io/soulteary/hello:2.2.0` or an immutable digest. `latest` follows the
+most recent release and `main` follows the default branch. See the
+[deployment recipes](docs/deployment.md) and [verification guide](docs/verification.md).
+
 ## HTTP mode
 
 Start the built-in server explicitly:
@@ -90,6 +95,18 @@ event: frame
 data: {"animation":"parrot","color":"#ff8787","frame":"...","index":0}
 ```
 
+The complete event also includes an increasing `id`, a one-second reconnect
+hint, and a comment heartbeat every 15 seconds:
+
+```text
+id: 0
+event: frame
+retry: 1000
+data: {"animation":"parrot","color":"#ff8787","frame":"...","index":0}
+
+: keepalive
+```
+
 SSE is application-level server push over a normal long-lived HTTP response.
 It is intentionally used instead of HTTP/2 resource push, which modern
 browsers no longer support as a general page-delivery mechanism.
@@ -108,6 +125,7 @@ docker run --rm -p 8080:8080 ghcr.io/soulteary/hello \
   browser stream.
 - `-delay` controls the SSE frame interval.
 - `-mono` disables browser color cycling.
+- `-http-max-streams` bounds concurrent SSE clients; the default is `64`.
 - `-loops` and `-list` cannot be combined with `-listen`.
 
 The server has bounded request/header timeouts and graceful `SIGINT`/`SIGTERM`
@@ -116,13 +134,19 @@ not cut off by a short global response timeout. When a reverse proxy sits in
 front of `/events`, disable response buffering for that route; hello also emits
 `X-Accel-Buffering: no` for compatible proxies.
 
+When all stream slots are occupied, a new `/events` request receives `503
+Service Unavailable` and `Retry-After: 1`; `/healthz` remains available. The
+browser page pauses the connection while hidden, offers a pause/resume control
+and starts paused when reduced motion is preferred.
+
 ### Reflected request information
 
-The plain-text response includes method, URL, host, hostname and version. A
+The plain-text response includes method, URL path, host, hostname and version. A
 blank line separates the greeting from the version, and the final line is
 `Project: https://github.com/soulteary/hello`. Root responses also expose that
-URL in the `Project` response header, including `HEAD` requests. The diagnostic
-body reflects only this explicit allowlist of common routing/identity headers:
+URL in the `Project` response header, including `HEAD` requests. Depending on
+the explicit diagnostic options, the body can reflect only this allowlist of
+common routing/identity headers:
 
 - `Forwarded`, `User-Agent`, `X-Real-IP`
 - `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Method`,
@@ -133,7 +157,13 @@ body reflects only this explicit allowlist of common routing/identity headers:
 
 Credential-bearing or unrecognized headers are never reflected. This includes
 `Authorization`, `Proxy-Authorization`, `Cookie`, `X-Auth-Token` and
-`X-Forwarded-Access-Token`.
+`X-Forwarded-Access-Token`. Identity-bearing fields (`X-Forwarded-User` and
+the allowlisted `X-Auth-*` fields) are also hidden by default, as is the query
+string. Use `-reflect-identity` or `-reflect-query` only in a controlled test
+environment. Disable the default hostname diagnostic with
+`-reflect-hostname=false` when infrastructure identifiers should remain
+private. Reverse proxies must strip client-supplied identity headers before
+adding trusted values.
 
 ## Animations
 
@@ -166,6 +196,10 @@ animation or understand its metadata and frame separators.
 | `-mono` | Disable rainbow colors. | `false` |
 | `-list` | List embedded animations and exit. | `false` |
 | `-listen` | Listen for HTTP requests instead of running the terminal loop. | `""` |
+| `-http-max-streams` | Maximum concurrent SSE clients in HTTP mode. | `64` |
+| `-reflect-query` | Include the raw query string in text diagnostics. | `false` |
+| `-reflect-identity` | Include allowlisted identity headers in text diagnostics. | `false` |
+| `-reflect-hostname` | Include the runtime hostname in text diagnostics. | `true` |
 | `-version` | Print the build version and exit. | `false` |
 | `-h`, `-help` | Print usage and exit. | `false` |
 
@@ -180,6 +214,9 @@ Install from source with the Go version declared in [`go.mod`](go.mod):
 go install github.com/soulteary/hello/cmd/hello@latest
 ```
 
+Pin `@v2.2.0` instead of `@latest` when a reproducible tool installation is
+required.
+
 Starting with `v2.0.0`, tagged releases include SHA-256 checksums and binaries
 for:
 
@@ -190,6 +227,10 @@ for:
 Release archives also include `LICENSE` and `NOTICE`. Container images run as a
 non-root user on a distroless base and carry the same files under
 `/usr/share/licenses/hello/`.
+
+The published `v2.1.0` GitHub Release is incomplete and has no downloadable
+archives. Use `v2.0.0` for prebuilt binaries until a later complete release is
+published; the incident is recorded in the [changelog](docs/CHANGELOG.md).
 
 ## Terminal compatibility
 
@@ -235,15 +276,18 @@ make cover COVERAGE_MIN=95
 ```
 
 CI verifies module tidiness, formatting, `go vet`, govulncheck,
-golangci-lint, race tests and the coverage floor. CodeQL runs on pushes, pull
-requests and a weekly schedule. Third-party GitHub Actions are pinned to full
-commit SHAs.
+golangci-lint, race tests and the coverage floor. It also starts the built
+container and checks its non-root runtime, OCI metadata, HTTP behavior and
+diagnostic defaults. Tagged releases verify archive contents, checksums and the
+stamped executable before publication. CodeQL runs on pushes, pull requests and
+a weekly schedule. Third-party GitHub Actions are pinned to full commit SHAs.
 
 See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for the contribution workflow,
 [SECURITY.md](.github/SECURITY.md) for private vulnerability reporting, and
-[the v2 migration guide](docs/migration-v2.md) for HTTP compatibility details.
-Maintainers should follow [the release guide](docs/releasing.md) before tagging
-`v2.0.0` or a later release.
+[the v2 migration guide](docs/migration-v2.md) for HTTP compatibility details,
+and [the deployment recipes](docs/deployment.md) for proxy and Kubernetes
+examples. Maintainers should follow [the release guide](docs/releasing.md)
+before creating any version tag.
 
 ## Credits and license
 

@@ -4,6 +4,8 @@ package httpserver
 
 import (
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,8 +27,10 @@ import (
 const (
 	shutdownTimeout    = 5 * time.Second
 	streamWriteTimeout = 5 * time.Second
+	streamHeartbeat    = 15 * time.Second
 	defaultFrameDelay  = 75 * time.Millisecond
 	maxFrameDelay      = 60 * time.Second
+	defaultMaxStreams  = 64
 	defaultAnimation   = "parrot"
 	projectHeader      = "Project"
 	projectURL         = "https://github.com/soulteary/hello"
@@ -47,23 +51,32 @@ var browserColors = []string{
 
 // Options configures the HTTP server.
 type Options struct {
-	Addr       string
-	Version    string
-	Animation  string
-	FrameDelay time.Duration
-	Mono       bool
-	Stdout     io.Writer
+	Addr            string
+	Version         string
+	Animation       string
+	FrameDelay      time.Duration
+	Mono            bool
+	MaxStreams      int
+	ReflectQuery    bool
+	ReflectIdentity bool
+	ReflectHostname bool
+	Stdout          io.Writer
 }
 
 // HandlerOptions configures the HTTP handler independently of its listener.
 // Inventory is primarily useful to callers that need a custom embedded
 // catalog; a nil inventory loads the animations shipped with hello.
 type HandlerOptions struct {
-	Version    string
-	Animation  string
-	FrameDelay time.Duration
-	Mono       bool
-	Inventory  animation.Inventory
+	Version           string
+	Animation         string
+	FrameDelay        time.Duration
+	Mono              bool
+	MaxStreams        int
+	ReflectQuery      bool
+	ReflectIdentity   bool
+	ReflectHostname   bool
+	HeartbeatInterval time.Duration
+	Inventory         animation.Inventory
 }
 
 // Run serves HTTP until ctx is cancelled or the listener fails.
@@ -80,10 +93,14 @@ func Run(ctx context.Context, opts Options) error {
 	}
 
 	handler, err := NewHandlerWithOptions(HandlerOptions{
-		Version:    opts.Version,
-		Animation:  opts.Animation,
-		FrameDelay: opts.FrameDelay,
-		Mono:       opts.Mono,
+		Version:         opts.Version,
+		Animation:       opts.Animation,
+		FrameDelay:      opts.FrameDelay,
+		Mono:            opts.Mono,
+		MaxStreams:      opts.MaxStreams,
+		ReflectQuery:    opts.ReflectQuery,
+		ReflectIdentity: opts.ReflectIdentity,
+		ReflectHostname: opts.ReflectHostname,
 	})
 	if err != nil {
 		return err
@@ -154,6 +171,18 @@ func NewHandlerWithOptions(opts HandlerOptions) (http.Handler, error) {
 	if opts.FrameDelay < time.Millisecond || opts.FrameDelay > maxFrameDelay {
 		return nil, fmt.Errorf("frame delay must be between 1ms and %s", maxFrameDelay)
 	}
+	if opts.MaxStreams == 0 {
+		opts.MaxStreams = defaultMaxStreams
+	}
+	if opts.MaxStreams < 0 {
+		return nil, errors.New("maximum event streams must be positive")
+	}
+	if opts.HeartbeatInterval == 0 {
+		opts.HeartbeatInterval = streamHeartbeat
+	}
+	if opts.HeartbeatInterval < time.Millisecond {
+		return nil, errors.New("stream heartbeat interval must be at least 1ms")
+	}
 	if opts.Inventory == nil {
 		opts.Inventory = animation.NewInventory()
 	}
@@ -171,12 +200,17 @@ func NewHandlerWithOptions(opts HandlerOptions) (http.Handler, error) {
 	}
 
 	app := handler{
-		version:    strings.TrimSpace(opts.Version),
-		name:       name,
-		animation:  anim,
-		textFrames: cacheDistinctFrames(anim.Frames),
-		frameDelay: opts.FrameDelay,
-		mono:       opts.Mono,
+		version:           strings.TrimSpace(opts.Version),
+		name:              name,
+		animation:         anim,
+		textFrames:        cacheDistinctFrames(anim.Frames),
+		frameDelay:        opts.FrameDelay,
+		heartbeatInterval: opts.HeartbeatInterval,
+		mono:              opts.Mono,
+		streamSlots:       make(chan struct{}, opts.MaxStreams),
+		reflectQuery:      opts.ReflectQuery,
+		reflectIdentity:   opts.ReflectIdentity,
+		reflectHostname:   opts.ReflectHostname,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", app.health)
@@ -186,12 +220,17 @@ func NewHandlerWithOptions(opts HandlerOptions) (http.Handler, error) {
 }
 
 type handler struct {
-	version    string
-	name       string
-	animation  animation.Animation
-	textFrames []string
-	frameDelay time.Duration
-	mono       bool
+	version           string
+	name              string
+	animation         animation.Animation
+	textFrames        []string
+	frameDelay        time.Duration
+	heartbeatInterval time.Duration
+	mono              bool
+	streamSlots       chan struct{}
+	reflectQuery      bool
+	reflectIdentity   bool
+	reflectHostname   bool
 }
 
 func (h handler) health(w http.ResponseWriter, r *http.Request) {
@@ -234,12 +273,21 @@ func (h handler) root(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	writeTextResponse(w, r, h.version, randomFrame(h.textFrames))
+	writeTextResponse(w, r, h.version, randomFrame(h.textFrames), diagnosticOptions{
+		query:    h.reflectQuery,
+		identity: h.reflectIdentity,
+		hostname: h.reflectHostname,
+	})
 }
 
 func (h handler) html(w http.ResponseWriter, r *http.Request) {
+	nonce, err := newNonce()
+	if err != nil {
+		http.Error(w, "build browser response", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; connect-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; connect-src 'self'; script-src 'nonce-"+nonce+"'; style-src 'nonce-"+nonce+"'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 	if r.Method == http.MethodHead {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -250,13 +298,23 @@ func (h handler) html(w http.ResponseWriter, r *http.Request) {
 		Frame      string
 		Mono       bool
 		ProjectURL string
+		Nonce      string
 	}{
 		Version:    h.version,
 		Animation:  h.name,
 		Frame:      string(h.animation.Frames[0]),
 		Mono:       h.mono,
 		ProjectURL: projectURL,
+		Nonce:      nonce,
 	})
+}
+
+func newNonce() (string, error) {
+	data := make([]byte, 18)
+	if _, err := cryptorand.Read(data); err != nil {
+		return "", err
+	}
+	return base64.RawStdEncoding.EncodeToString(data), nil
 }
 
 func (h handler) events(w http.ResponseWriter, r *http.Request) {
@@ -270,6 +328,14 @@ func (h handler) events(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 	if r.Method == http.MethodHead {
 		w.WriteHeader(http.StatusOK)
+		return
+	}
+	select {
+	case h.streamSlots <- struct{}{}:
+		defer func() { <-h.streamSlots }()
+	default:
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, "too many event streams", http.StatusServiceUnavailable)
 		return
 	}
 	controller := http.NewResponseController(w)
@@ -295,7 +361,7 @@ func (h handler) events(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	_ = streamAnimation(r.Context(), w, prepare, controller.Flush, h.name, h.animation, h.frameDelay, h.mono)
+	_ = streamAnimation(r.Context(), w, prepare, controller.Flush, h.name, h.animation, h.frameDelay, h.heartbeatInterval, h.mono)
 }
 
 func setResponseHeaders(w http.ResponseWriter) {
@@ -385,32 +451,47 @@ func randomFrame(frames []string) string {
 	return frames[rand.IntN(len(frames))]
 }
 
-func writeTextResponse(w io.Writer, r *http.Request, version, frame string) {
+type diagnosticOptions struct {
+	query    bool
+	identity bool
+	hostname bool
+}
+
+func writeTextResponse(w io.Writer, r *http.Request, version, frame string, opts diagnosticOptions) {
 	_, _ = io.WriteString(w, frame)
 	if frame == "" || frame[len(frame)-1] != '\n' {
 		_, _ = io.WriteString(w, "\n")
 	}
 	_, _ = io.WriteString(w, "\n")
-	writeRequestSummary(w, r, version)
+	writeRequestSummary(w, r, version, opts)
 }
 
-func writeRequestSummary(w io.Writer, r *http.Request, version string) {
-	hostname, _ := os.Hostname()
+func writeRequestSummary(w io.Writer, r *http.Request, version string, opts diagnosticOptions) {
 	fmt.Fprintln(w, "Hello from soulteary/hello!")
 	fmt.Fprintln(w)
 	if strings.TrimSpace(version) != "" {
 		fmt.Fprintf(w, "Version: %s\n", version)
 	}
-	if hostname != "" {
-		fmt.Fprintf(w, "Hostname: %s\n", hostname)
+	if opts.hostname {
+		hostname, _ := os.Hostname()
+		if hostname != "" {
+			fmt.Fprintf(w, "Hostname: %s\n", hostname)
+		}
 	}
 	fmt.Fprintf(w, "Method: %s\n", r.Method)
-	fmt.Fprintf(w, "URL: %s\n", r.URL.RequestURI())
+	requestURL := r.URL.EscapedPath()
+	if requestURL == "" {
+		requestURL = "/"
+	}
+	if opts.query && r.URL.RawQuery != "" {
+		requestURL += "?" + r.URL.RawQuery
+	}
+	fmt.Fprintf(w, "URL: %s\n", requestURL)
 	fmt.Fprintf(w, "Host: %s\n", r.Host)
 
 	keys := make([]string, 0, len(r.Header))
 	for key := range r.Header {
-		if safeReflectedHeader(key) {
+		if safeReflectedHeader(key, opts.identity) {
 			keys = append(keys, key)
 		}
 	}
@@ -423,7 +504,7 @@ func writeRequestSummary(w io.Writer, r *http.Request, version string) {
 	fmt.Fprintf(w, "Project: %s\n", projectURL)
 }
 
-func safeReflectedHeader(name string) bool {
+func safeReflectedHeader(name string, reflectIdentity bool) bool {
 	switch http.CanonicalHeaderKey(name) {
 	case "Forwarded",
 		"User-Agent",
@@ -434,15 +515,16 @@ func safeReflectedHeader(name string) bool {
 		"X-Forwarded-Port",
 		"X-Forwarded-Prefix",
 		"X-Forwarded-Proto",
-		"X-Forwarded-Uri",
-		"X-Forwarded-User",
+		"X-Forwarded-Uri":
+		return true
+	case "X-Forwarded-User",
 		"X-Auth-Email",
 		"X-Auth-Groups",
 		"X-Auth-Name",
 		"X-Auth-Role",
 		"X-Auth-Scopes",
 		"X-Auth-User":
-		return true
+		return reflectIdentity
 	default:
 		return false
 	}
@@ -463,6 +545,7 @@ func streamAnimation(
 	name string,
 	anim animation.Animation,
 	delay time.Duration,
+	heartbeatInterval time.Duration,
 	mono bool,
 ) error {
 	if len(anim.Frames) == 0 {
@@ -471,19 +554,18 @@ func streamAnimation(
 	if delay <= 0 {
 		return errors.New("frame delay must be positive")
 	}
+	if heartbeatInterval <= 0 {
+		return errors.New("heartbeat interval must be positive")
+	}
 
 	ticker := time.NewTicker(delay)
 	defer ticker.Stop()
+	heartbeat := time.NewTicker(heartbeatInterval)
+	defer heartbeat.Stop()
 	var sequence uint64
 	frameIndex := 0
 	colorIndex := 0
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
+	emitFrame := func() error {
 		if prepare != nil {
 			if err := prepare(); err != nil {
 				return err
@@ -506,17 +588,49 @@ func streamAnimation(
 				return err
 			}
 		}
-
 		sequence++
 		frameIndex = (frameIndex + 1) % len(anim.Frames)
 		if !mono {
 			colorIndex = (colorIndex + 1) % len(browserColors)
 		}
+		return nil
+	}
+	emitHeartbeat := func() error {
+		if prepare != nil {
+			if err := prepare(); err != nil {
+				return err
+			}
+		}
+		if _, err := io.WriteString(w, ": keepalive\n\n"); err != nil {
+			return err
+		}
+		if flush != nil {
+			return flush()
+		}
+		return nil
+	}
 
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+	if err := emitFrame(); err != nil {
+		return err
+	}
+
+	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
+			if err := emitFrame(); err != nil {
+				return err
+			}
+		case <-heartbeat.C:
+			if err := emitHeartbeat(); err != nil {
+				return err
+			}
 		}
 	}
 }
@@ -536,7 +650,7 @@ var browserPage = template.Must(template.New("browser").Parse(`<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>hello · {{.Animation}}</title>
-  <style>
+  <style nonce="{{.Nonce}}">
     :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
     * { box-sizing: border-box; }
     body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at top, #1d2a3b, #090d13 65%); color: #d6e2f0; }
@@ -551,6 +665,9 @@ var browserPage = template.Must(template.New("browser").Parse(`<!doctype html>
     .project { margin-bottom: 10px; color: #71859d; font-size: 13px; font-style: italic; }
     .project a { color: #90a4bb; text-underline-offset: 3px; }
     .project a:hover { color: #d6e2f0; }
+    .controls { display: flex; gap: 8px; margin-top: 12px; }
+    button { border: 1px solid #34465c; border-radius: 8px; padding: 7px 12px; background: #111923; color: #d6e2f0; cursor: pointer; }
+    button:hover { background: #182434; }
     code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
   </style>
 </head>
@@ -563,13 +680,15 @@ var browserPage = template.Must(template.New("browser").Parse(`<!doctype html>
       <div class="bar"><span class="dot" aria-hidden="true"></span>hello {{if .Version}}· {{.Version}}{{end}}</div>
       <pre id="screen" aria-live="off">{{.Frame}}</pre>
     </section>
+    <div class="controls"><button id="toggle" type="button">Pause animation</button></div>
     <p id="status" class="status" role="status">Connecting to the event stream…</p>
     <noscript><p class="status">JavaScript is disabled, so this page shows the first frame only.</p></noscript>
   </main>
-  <script>
+  <script nonce="{{.Nonce}}">
     (() => {
       const screen = document.getElementById("screen");
       const status = document.getElementById("status");
+      const toggle = document.getElementById("toggle");
       if (!("EventSource" in window)) {
         status.textContent = "This browser does not support server-sent events; showing a static frame.";
         return;
@@ -578,18 +697,41 @@ var browserPage = template.Must(template.New("browser").Parse(`<!doctype html>
       eventsURL.search = "";
       eventsURL.hash = "";
       eventsURL.pathname = eventsURL.pathname.replace(/\/?$/, "/events");
-      const source = new EventSource(eventsURL);
-      source.addEventListener("open", () => { status.textContent = "Live · server-sent events"; });
-      source.addEventListener("frame", (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          screen.textContent = payload.frame;
-          screen.style.color = payload.color;
-        } catch (_) {
-          status.textContent = "Received an invalid frame; reconnecting…";
-        }
+      let source = null;
+      let paused = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const connect = () => {
+        if (source || paused || document.hidden) return;
+        source = new EventSource(eventsURL);
+        source.addEventListener("open", () => { status.textContent = "Live · server-sent events"; });
+        source.addEventListener("frame", (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            screen.textContent = payload.frame;
+            screen.style.color = payload.color;
+          } catch (_) {
+            status.textContent = "Received an invalid frame; reconnecting…";
+          }
+        });
+        source.addEventListener("error", () => { status.textContent = "Stream interrupted · reconnecting automatically…"; });
+      };
+      const disconnect = () => {
+        if (source) source.close();
+        source = null;
+      };
+      const renderPaused = () => {
+        toggle.textContent = paused ? "Resume animation" : "Pause animation";
+        status.textContent = paused ? "Paused · showing a static frame" : "Connecting to the event stream…";
+      };
+      toggle.addEventListener("click", () => {
+        paused = !paused;
+        if (paused) disconnect(); else connect();
+        renderPaused();
       });
-      source.addEventListener("error", () => { status.textContent = "Stream interrupted · reconnecting automatically…"; });
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) disconnect(); else connect();
+      });
+      renderPaused();
+      connect();
     })();
   </script>
 </body>

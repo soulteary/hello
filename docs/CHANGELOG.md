@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-09-04
+
+### Added
+
+- A configurable `-http-max-streams` limit for concurrent SSE clients, with a
+  bounded default of 64 and a retryable `503 Service Unavailable` response
+  when the limit is full.
+- SSE keepalive comments, browser pause/resume controls, reduced-motion
+  support and automatic stream suspension while the page is hidden.
+- Explicit `-reflect-query`, `-reflect-identity` and `-reflect-hostname`
+  controls for HTTP diagnostics.
+- Container smoke tests covering the version, OCI labels, non-root user,
+  health endpoint, browser page and default diagnostic redaction.
+- Release-archive checks for filenames, license notices, checksums and the
+  executable's stamped version.
+- Signed GitHub build-provenance attestations for release archives and the
+  aggregate checksum file.
+- Deployment recipes for Docker Compose, Nginx, Traefik and Kubernetes, plus
+  container-signature and release-checksum verification instructions.
+
+### Changed
+
+- URL query strings and identity-bearing proxy headers are no longer reflected
+  by default. Operators can enable them explicitly when the echo behavior is
+  required in a controlled test environment.
+- Browser HTML now uses per-response CSP nonces instead of allowing arbitrary
+  inline scripts and styles.
+- Docker pull-request and manual runs build without registry write or OIDC
+  permissions; only push-triggered publish jobs receive those permissions.
+- Manual Docker workflow runs no longer publish images. Release tags must be
+  valid SemVer, point to a commit contained in `main`, use an annotated or
+  signed tag object, and have a dated changelog section before images or
+  archives are published.
+- Go Report Card updates no longer use a commit-message marker that suppresses
+  push-triggered release workflows.
+- The Dockerfile frontend, Go builder and distroless runtime images are pinned
+  by digest while retaining readable tags for automated dependency updates.
+
+### Fixed
+
+- Terminal rendering now propagates output and short-write failures instead of
+  continuing an infinite animation after a pipe or output destination closes.
+- Release and container workflows now verify the artifacts they claim to
+  publish and verify keyless container signatures immediately after signing.
+
+### Security
+
+- Identity headers and raw query strings require explicit opt-in before they
+  can appear in diagnostics.
+- Long-lived SSE connections are bounded and emit low-cost heartbeats.
+- Release validation is applied independently in both binary and container
+  publication paths so a malformed tag cannot update `latest`.
+
+## [2.1.0] - 2026-08-30
+
+### Changed
+
+- Simplified end-to-end content-negotiation, animation-parser and SSE stream
+  tests without changing runtime behavior.
+
+### Known issues
+
+- The GitHub Release was created without binary archives or checksums and its
+  tag did not run the release or container workflows. Use `v2.0.0` until a
+  later complete release is available.
+
 ## [2.0.0] - 2026-08-30
 
 ### Added
@@ -84,5 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from plain-text diagnostics.
 - Third-party GitHub Actions are pinned to reviewed full commit SHAs.
 
-[Unreleased]: https://github.com/soulteary/hello/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/soulteary/hello/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/soulteary/hello/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/soulteary/hello/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/soulteary/hello/compare/v1.0.24...v2.0.0

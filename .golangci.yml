@@ -16,7 +16,6 @@ linters:
         - fmt.Fprint
         - fmt.Fprintf
         - fmt.Fprintln
-        - (io.Writer).Write
 
 formatters:
   enable:

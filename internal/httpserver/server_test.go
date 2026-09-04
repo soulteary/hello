@@ -196,8 +196,8 @@ func BenchmarkRandomCachedFrame(b *testing.B) {
 	}
 }
 
-func TestRootReflectsOnlyExplicitlySafeProxyHeaders(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "http://hello.example/", nil)
+func TestRootRedactsQueryAndIdentityByDefault(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://hello.example/?token=must-not-leak-query", nil)
 	req.Header.Set("User-Agent", "curl/8.5.0")
 	req.Header.Set("X-Forwarded-User", "test-admin-001")
 	req.Header.Set("X-Auth-Email", "admin@example.com")
@@ -211,18 +211,26 @@ func TestRootReflectsOnlyExplicitlySafeProxyHeaders(t *testing.T) {
 
 	newSmallHandler(t, HandlerOptions{Version: "2.0.0"}).ServeHTTP(recorder, req)
 	text := recorder.Body.String()
-	for _, want := range []string{
-		"X-Forwarded-User: test-admin-001",
-		"X-Auth-Email: admin@example.com",
-		"User-Agent: curl/8.5.0",
-	} {
+	for _, want := range []string{"User-Agent: curl/8.5.0", "URL: /"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("response does not contain %q: %s", want, text)
 		}
 	}
-	for _, secret := range []string{"must-not-leak", "Authorization:", "Cookie:", "X-Auth-Token:", "X-Forwarded-Access-Token:"} {
+	for _, secret := range []string{"must-not-leak", "admin@example.com", "test-admin-001", "Authorization:", "Cookie:", "X-Auth-Token:", "X-Forwarded-Access-Token:"} {
 		if strings.Contains(text, secret) {
 			t.Errorf("response leaked %q: %s", secret, text)
+		}
+	}
+
+	optIn := httptest.NewRecorder()
+	newSmallHandler(t, HandlerOptions{ReflectQuery: true, ReflectIdentity: true}).ServeHTTP(optIn, req)
+	for _, want := range []string{
+		"URL: /?token=must-not-leak-query",
+		"X-Forwarded-User: test-admin-001",
+		"X-Auth-Email: admin@example.com",
+	} {
+		if !strings.Contains(optIn.Body.String(), want) {
+			t.Errorf("opt-in response does not contain %q: %s", want, optIn.Body.String())
 		}
 	}
 }
@@ -244,6 +252,12 @@ func TestHTMLTemplateEscapesVersion(t *testing.T) {
 	}
 	if !strings.Contains(recorder.Header().Get("Content-Security-Policy"), "connect-src 'self'") {
 		t.Errorf("unexpected CSP: %s", recorder.Header().Get("Content-Security-Policy"))
+	}
+	if strings.Contains(recorder.Header().Get("Content-Security-Policy"), "'unsafe-inline'") {
+		t.Errorf("CSP still allows unsafe inline content: %s", recorder.Header().Get("Content-Security-Policy"))
+	}
+	if !strings.Contains(body, `nonce="`) || !strings.Contains(body, "Pause animation") || !strings.Contains(body, "prefers-reduced-motion") {
+		t.Errorf("nonce or accessible animation controls are missing: %s", body)
 	}
 	wantLink := `Project: <a href="` + projectURL + `">` + projectURL + `</a>`
 	if !strings.Contains(body, wantLink) {
@@ -340,15 +354,15 @@ func TestAcceptsHTML(t *testing.T) {
 func TestSafeReflectedHeader(t *testing.T) {
 	tests := map[string]bool{
 		"Forwarded":                       true,
-		"X-Forwarded-User":                true,
+		"X-Forwarded-User":                false,
 		"X-Forwarded-For":                 true,
 		"X-Forwarded-Proto":               true,
-		"X-Auth-User":                     true,
-		"X-Auth-Email":                    true,
-		"X-Auth-Groups":                   true,
-		"X-Auth-Name":                     true,
-		"X-Auth-Role":                     true,
-		"X-Auth-Scopes":                   true,
+		"X-Auth-User":                     false,
+		"X-Auth-Email":                    false,
+		"X-Auth-Groups":                   false,
+		"X-Auth-Name":                     false,
+		"X-Auth-Role":                     false,
+		"X-Auth-Scopes":                   false,
 		"X-Real-IP":                       true,
 		"User-Agent":                      true,
 		"Authorization":                   false,
@@ -362,8 +376,13 @@ func TestSafeReflectedHeader(t *testing.T) {
 		"X-Random":                        false,
 	}
 	for name, want := range tests {
-		if got := safeReflectedHeader(name); got != want {
-			t.Errorf("safeReflectedHeader(%q) = %t, want %t", name, got, want)
+		if got := safeReflectedHeader(name, false); got != want {
+			t.Errorf("safeReflectedHeader(%q, false) = %t, want %t", name, got, want)
+		}
+	}
+	for _, name := range []string{"X-Forwarded-User", "X-Auth-User", "X-Auth-Email", "X-Auth-Groups", "X-Auth-Name", "X-Auth-Role", "X-Auth-Scopes"} {
+		if !safeReflectedHeader(name, true) {
+			t.Errorf("safeReflectedHeader(%q, true) = false, want true", name)
 		}
 	}
 }
@@ -377,6 +396,8 @@ func TestNewHandlerValidation(t *testing.T) {
 		{name: "negative delay", opts: HandlerOptions{FrameDelay: -time.Millisecond, Inventory: smallInventory()}, want: "frame delay"},
 		{name: "sub-millisecond delay", opts: HandlerOptions{FrameDelay: time.Microsecond, Inventory: smallInventory()}, want: "frame delay"},
 		{name: "excessive delay", opts: HandlerOptions{FrameDelay: maxFrameDelay + time.Millisecond, Inventory: smallInventory()}, want: "frame delay"},
+		{name: "negative stream limit", opts: HandlerOptions{MaxStreams: -1, Inventory: smallInventory()}, want: "maximum event streams"},
+		{name: "invalid heartbeat", opts: HandlerOptions{HeartbeatInterval: time.Microsecond, Inventory: smallInventory()}, want: "heartbeat"},
 		{name: "unknown animation", opts: HandlerOptions{Animation: "missing", Inventory: smallInventory()}, want: `animation "missing" not found`},
 		{name: "empty animation", opts: HandlerOptions{Inventory: animation.Inventory{"parrot": {}}}, want: "has no frames"},
 	}
@@ -411,6 +432,29 @@ func TestEventStreamOverHTTP(t *testing.T) {
 	event := readFirstFrameEvent(t, response.Body)
 	if event.Animation != "parrot" || event.Frame != "PARROT-A" || event.Index != 0 || event.Color != browserColors[0] {
 		t.Errorf("unexpected first event: %+v", event)
+	}
+	cancel()
+}
+
+func TestEventStreamConcurrencyLimit(t *testing.T) {
+	handler := newSmallHandler(t, HandlerOptions{FrameDelay: time.Millisecond, MaxStreams: 1})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	first := openEventStream(t, ctx, server.URL)
+	defer closeResponseBody(t, first.Body)
+
+	second, err := http.Get(server.URL + "/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeResponseBody(t, second.Body)
+	if second.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("second stream status = %d, want 503", second.StatusCode)
+	}
+	if second.Header.Get("Retry-After") != "1" {
+		t.Errorf("Retry-After = %q, want 1", second.Header.Get("Retry-After"))
 	}
 	cancel()
 }
@@ -484,7 +528,7 @@ func TestStreamAnimationLifecycleAndErrors(t *testing.T) {
 				cancel()
 			}
 			return nil
-		}, "parrot", anim, time.Millisecond, false)
+		}, "parrot", anim, time.Millisecond, time.Hour, false)
 		if !errors.Is(err, context.Canceled) {
 			t.Fatalf("error = %v, want context.Canceled", err)
 		}
@@ -499,7 +543,7 @@ func TestStreamAnimationLifecycleAndErrors(t *testing.T) {
 	t.Run("mono color", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		var output bytes.Buffer
-		err := streamAnimation(ctx, &output, nil, func() error { cancel(); return nil }, "parrot", anim, time.Millisecond, true)
+		err := streamAnimation(ctx, &output, nil, func() error { cancel(); return nil }, "parrot", anim, time.Millisecond, time.Hour, true)
 		if !errors.Is(err, context.Canceled) {
 			t.Fatalf("error = %v", err)
 		}
@@ -511,29 +555,36 @@ func TestStreamAnimationLifecycleAndErrors(t *testing.T) {
 	t.Run("already canceled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		err := streamAnimation(ctx, io.Discard, nil, nil, "parrot", anim, time.Millisecond, false)
+		err := streamAnimation(ctx, io.Discard, nil, nil, "parrot", anim, time.Millisecond, time.Hour, false)
 		if !errors.Is(err, context.Canceled) {
 			t.Fatalf("error = %v, want context.Canceled", err)
 		}
 	})
 
 	t.Run("empty frames", func(t *testing.T) {
-		err := streamAnimation(context.Background(), io.Discard, nil, nil, "empty", animation.Animation{}, time.Millisecond, false)
+		err := streamAnimation(context.Background(), io.Discard, nil, nil, "empty", animation.Animation{}, time.Millisecond, time.Hour, false)
 		if err == nil || !strings.Contains(err.Error(), "no frames") {
 			t.Fatalf("error = %v", err)
 		}
 	})
 
 	t.Run("invalid delay", func(t *testing.T) {
-		err := streamAnimation(context.Background(), io.Discard, nil, nil, "parrot", anim, 0, false)
+		err := streamAnimation(context.Background(), io.Discard, nil, nil, "parrot", anim, 0, time.Hour, false)
 		if err == nil || !strings.Contains(err.Error(), "positive") {
+			t.Fatalf("error = %v", err)
+		}
+	})
+
+	t.Run("invalid heartbeat", func(t *testing.T) {
+		err := streamAnimation(context.Background(), io.Discard, nil, nil, "parrot", anim, time.Millisecond, 0, false)
+		if err == nil || !strings.Contains(err.Error(), "heartbeat") {
 			t.Fatalf("error = %v", err)
 		}
 	})
 
 	t.Run("prepare error", func(t *testing.T) {
 		want := errors.New("prepare")
-		err := streamAnimation(context.Background(), io.Discard, func() error { return want }, nil, "parrot", anim, time.Millisecond, false)
+		err := streamAnimation(context.Background(), io.Discard, func() error { return want }, nil, "parrot", anim, time.Millisecond, time.Hour, false)
 		if !errors.Is(err, want) {
 			t.Fatalf("error = %v, want %v", err, want)
 		}
@@ -541,7 +592,7 @@ func TestStreamAnimationLifecycleAndErrors(t *testing.T) {
 
 	t.Run("writer error", func(t *testing.T) {
 		want := errors.New("write")
-		err := streamAnimation(context.Background(), errorWriter{err: want}, nil, nil, "parrot", anim, time.Millisecond, false)
+		err := streamAnimation(context.Background(), errorWriter{err: want}, nil, nil, "parrot", anim, time.Millisecond, time.Hour, false)
 		if !errors.Is(err, want) {
 			t.Fatalf("error = %v, want %v", err, want)
 		}
@@ -549,9 +600,28 @@ func TestStreamAnimationLifecycleAndErrors(t *testing.T) {
 
 	t.Run("flush error", func(t *testing.T) {
 		want := errors.New("flush")
-		err := streamAnimation(context.Background(), io.Discard, nil, func() error { return want }, "parrot", anim, time.Millisecond, false)
+		err := streamAnimation(context.Background(), io.Discard, nil, func() error { return want }, "parrot", anim, time.Millisecond, time.Hour, false)
 		if !errors.Is(err, want) {
 			t.Fatalf("error = %v, want %v", err, want)
+		}
+	})
+
+	t.Run("heartbeat", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		var output bytes.Buffer
+		flushes := 0
+		err := streamAnimation(ctx, &output, nil, func() error {
+			flushes++
+			if flushes == 2 {
+				cancel()
+			}
+			return nil
+		}, "parrot", anim, time.Hour, time.Millisecond, false)
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("error = %v, want context.Canceled", err)
+		}
+		if !strings.Contains(output.String(), ": keepalive\n\n") {
+			t.Errorf("heartbeat is missing: %s", output.String())
 		}
 	})
 }
@@ -590,7 +660,7 @@ func TestWriteTextResponseNewlineHandling(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://hello.example/", nil)
 	for _, frame := range []string{"", "A", "A\n"} {
 		var output bytes.Buffer
-		writeTextResponse(&output, req, "", frame)
+		writeTextResponse(&output, req, "", frame, diagnosticOptions{})
 		if !strings.Contains(output.String(), "\n\nHello from") {
 			t.Errorf("frame %q did not end with one blank separator: %q", frame, output.String())
 		}
