@@ -30,7 +30,7 @@ make build
 
 `make check` includes a non-mutating `go mod tidy -diff` check, formatting,
 `go vet`, golangci-lint, govulncheck, race-enabled tests and the
-statement-coverage floor. The default minimum is 90%; do not lower it to make
+statement-coverage floor. The default minimum is 100%; do not lower it to make
 a release pass.
 
 Build and smoke-test the container when Docker is available:

@@ -33,6 +33,27 @@ func Test_NewInventory_HasParrotAndPedro(t *testing.T) {
 	}
 }
 
+func Test_MustLoadInventory_PanicsOnSetupErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		filesystem    fs.FS
+		filesystemErr error
+	}{
+		{name: "sub-filesystem error", filesystem: fstest.MapFS{}, filesystemErr: errors.New("sub failed")},
+		{name: "inventory load error", filesystem: failingFS{}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("mustLoadInventory did not panic")
+				}
+			}()
+			mustLoadInventory(tc.filesystem, tc.filesystemErr)
+		})
+	}
+}
+
 func Test_LoadFromFS_IgnoresNonAnimationFiles(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("hello"), 0o644); err != nil {

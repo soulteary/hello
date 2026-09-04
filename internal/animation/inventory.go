@@ -52,12 +52,16 @@ func (i Inventory) LoadFromFS(filesystem fs.FS) error {
 // animations directory. It panics if the embedded data is malformed because
 // that indicates a build-time bug, not a runtime condition.
 func NewInventory() Inventory {
-	i := make(Inventory)
 	sub, err := fs.Sub(animations, "assets/animations")
-	if err != nil {
-		panic(err)
+	return mustLoadInventory(sub, err)
+}
+
+func mustLoadInventory(filesystem fs.FS, filesystemErr error) Inventory {
+	if filesystemErr != nil {
+		panic(filesystemErr)
 	}
-	if err := i.LoadFromFS(sub); err != nil {
+	i := make(Inventory)
+	if err := i.LoadFromFS(filesystem); err != nil {
 		panic(err)
 	}
 	return i

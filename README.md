@@ -260,7 +260,7 @@ Common commands:
 make help          # list targets
 make build         # build ./hello with version metadata
 make test          # run all tests with the race detector
-make cover         # run tests and enforce the 90% statement-coverage floor
+make cover         # run tests and enforce the 100% statement-coverage floor
 make lint          # run required golangci-lint checks
 make vuln          # scan reachable code with govulncheck
 make check         # run every required local quality gate, including tidy
@@ -269,11 +269,8 @@ make bench         # run renderer benchmarks
 make docker        # build a local container image
 ```
 
-Override the coverage floor when deliberately testing a stricter target:
-
-```bash
-make cover COVERAGE_MIN=95
-```
+The default and CI coverage floor is 100%. Keep new success and failure paths
+covered instead of lowering `COVERAGE_MIN`.
 
 CI verifies module tidiness, formatting, `go vet`, govulncheck,
 golangci-lint, race tests and the coverage floor. It also starts the built

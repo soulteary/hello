@@ -240,7 +240,7 @@ Windows 建议使用 Windows Terminal 或较新的 PowerShell。旧版 `cmd.exe`
 make help          # 查看所有目标
 make build         # 构建带版本信息的 ./hello
 make test          # 使用 race detector 运行全部测试
-make cover         # 运行测试并执行 90% 语句覆盖率门槛
+make cover         # 运行测试并执行 100% 语句覆盖率门槛
 make lint          # 运行必需的 golangci-lint
 make vuln          # 使用 govulncheck 扫描可达代码
 make check         # 运行全部必需的本地质量门槛（含模块整洁性）
@@ -249,11 +249,8 @@ make bench         # 运行渲染器基准测试
 make docker        # 构建本地容器镜像
 ```
 
-需要验证更高覆盖率目标时，可覆盖默认门槛：
-
-```bash
-make cover COVERAGE_MIN=95
-```
+默认门槛和 CI 门槛均为 100%。新增成功或失败路径时应补齐测试，而不是降低
+`COVERAGE_MIN`。
 
 CI 会检查模块整洁性、格式、`go vet`、govulncheck、golangci-lint、竞态测试和
 覆盖率门槛，还会实际启动构建出的容器，检查非 root 用户、OCI 元数据、HTTP

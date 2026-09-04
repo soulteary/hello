@@ -20,13 +20,18 @@ import (
 // version is overridden at build time via -ldflags "-X main.version=...".
 // "dev" is a sensible default for `go run` and unstamped local builds.
 var version = "dev"
+var exitProcess = os.Exit
 
 func currentVersion() string {
-	info, ok := debug.ReadBuildInfo()
-	if !ok {
-		return resolveVersion(version, "")
+	info, _ := debug.ReadBuildInfo()
+	return resolveVersion(version, buildInfoVersion(info))
+}
+
+func buildInfoVersion(info *debug.BuildInfo) string {
+	if info == nil {
+		return ""
 	}
-	return resolveVersion(version, info.Main.Version)
+	return info.Main.Version
 }
 
 func resolveVersion(stamped, moduleVersion string) string {
@@ -43,7 +48,7 @@ func resolveVersion(stamped, moduleVersion string) string {
 }
 
 func main() {
-	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+	exitProcess(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
 type serverRunner func(context.Context, httpserver.Options) error

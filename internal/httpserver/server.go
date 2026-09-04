@@ -125,12 +125,22 @@ func Run(ctx context.Context, opts Options) error {
 		MaxHeaderBytes: 64 << 10,
 	}
 	server.RegisterOnShutdown(cancelRequests)
+	return serve(ctx, server, listener, opts.Stdout)
+}
+
+type serverLifecycle interface {
+	Serve(net.Listener) error
+	Shutdown(context.Context) error
+	Close() error
+}
+
+func serve(ctx context.Context, server serverLifecycle, listener net.Listener, stdout io.Writer) error {
 	serveErr := make(chan error, 1)
 	go func() {
 		serveErr <- server.Serve(listener)
 	}()
 
-	fmt.Fprintf(opts.Stdout, "hello HTTP server listening on %s\n", listener.Addr())
+	fmt.Fprintf(stdout, "hello HTTP server listening on %s\n", listener.Addr())
 	select {
 	case err := <-serveErr:
 		if errors.Is(err, http.ErrServerClosed) {
@@ -156,6 +166,10 @@ func Run(ctx context.Context, opts Options) error {
 // delay. It is retained as a compact entry point for tests and embedders.
 func NewHandler(version string) http.Handler {
 	handler, err := NewHandlerWithOptions(HandlerOptions{Version: version})
+	return mustHandler(handler, err)
+}
+
+func mustHandler(handler http.Handler, err error) http.Handler {
 	if err != nil {
 		panic(err)
 	}
@@ -281,7 +295,11 @@ func (h handler) root(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) html(w http.ResponseWriter, r *http.Request) {
-	nonce, err := newNonce()
+	h.writeHTML(w, r, newNonce)
+}
+
+func (h handler) writeHTML(w http.ResponseWriter, r *http.Request, nonceGenerator func() (string, error)) {
+	nonce, err := nonceGenerator()
 	if err != nil {
 		http.Error(w, "build browser response", http.StatusInternalServerError)
 		return
@@ -310,8 +328,12 @@ func (h handler) html(w http.ResponseWriter, r *http.Request) {
 }
 
 func newNonce() (string, error) {
+	return nonceFromReader(cryptorand.Reader)
+}
+
+func nonceFromReader(reader io.Reader) (string, error) {
 	data := make([]byte, 18)
-	if _, err := cryptorand.Read(data); err != nil {
+	if _, err := io.ReadFull(reader, data); err != nil {
 		return "", err
 	}
 	return base64.RawStdEncoding.EncodeToString(data), nil
@@ -491,7 +513,7 @@ func writeRequestSummary(w io.Writer, r *http.Request, version string, opts diag
 
 	keys := make([]string, 0, len(r.Header))
 	for key := range r.Header {
-		if safeReflectedHeader(key, opts.identity) {
+		if safeReflectedHeader(key, opts) {
 			keys = append(keys, key)
 		}
 	}
@@ -504,7 +526,7 @@ func writeRequestSummary(w io.Writer, r *http.Request, version string, opts diag
 	fmt.Fprintf(w, "Project: %s\n", projectURL)
 }
 
-func safeReflectedHeader(name string, reflectIdentity bool) bool {
+func safeReflectedHeader(name string, opts diagnosticOptions) bool {
 	switch http.CanonicalHeaderKey(name) {
 	case "Forwarded",
 		"User-Agent",
@@ -514,9 +536,10 @@ func safeReflectedHeader(name string, reflectIdentity bool) bool {
 		"X-Forwarded-Method",
 		"X-Forwarded-Port",
 		"X-Forwarded-Prefix",
-		"X-Forwarded-Proto",
-		"X-Forwarded-Uri":
+		"X-Forwarded-Proto":
 		return true
+	case "X-Forwarded-Uri":
+		return opts.query
 	case "X-Forwarded-User",
 		"X-Auth-Email",
 		"X-Auth-Groups",
@@ -524,7 +547,7 @@ func safeReflectedHeader(name string, reflectIdentity bool) bool {
 		"X-Auth-Role",
 		"X-Auth-Scopes",
 		"X-Auth-User":
-		return reflectIdentity
+		return opts.identity
 	default:
 		return false
 	}
@@ -636,7 +659,11 @@ func streamAnimation(
 }
 
 func writeFrameEvent(w io.Writer, sequence uint64, event frameEvent) error {
-	payload, err := json.Marshal(event)
+	return writeFrameEventWithMarshal(w, sequence, event, json.Marshal)
+}
+
+func writeFrameEventWithMarshal(w io.Writer, sequence uint64, event frameEvent, marshal func(any) ([]byte, error)) error {
+	payload, err := marshal(event)
 	if err != nil {
 		return err
 	}

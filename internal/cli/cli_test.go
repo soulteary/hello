@@ -78,6 +78,12 @@ func Test_RunValidation(t *testing.T) {
 	}
 }
 
+func Test_RunDefaultsNilWriters(t *testing.T) {
+	if code := run(Options{}, animation.Inventory{}); code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+}
+
 func Test_RunListUnknownAndSuccess(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if code := Run(Options{List: true, Delay: time.Millisecond, Stdout: &stdout, Stderr: &stderr}); code != 0 {
@@ -135,9 +141,67 @@ func Test_RunStopsOnOutputFailure(t *testing.T) {
 	}
 }
 
+func Test_RunCoversDescriptionlessAndLateWriteFailures(t *testing.T) {
+	inv := animation.Inventory{
+		"plain": {
+			Frames: [][]byte{[]byte("frame")},
+		},
+	}
+
+	var stdout, stderr bytes.Buffer
+	if code := run(Options{List: true, Delay: time.Millisecond, Stdout: &stdout, Stderr: &stderr}, inv); code != 0 {
+		t.Fatalf("descriptionless list exit code = %d; stderr: %s", code, stderr.String())
+	}
+	if stdout.String() != "plain\n" {
+		t.Fatalf("descriptionless list output = %q", stdout.String())
+	}
+
+	want := errors.New("late write failure")
+	for _, tc := range []struct {
+		name   string
+		failAt int
+	}{
+		{name: "animation frame", failAt: 2},
+		{name: "terminal cleanup", failAt: 3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			writer := &failOnCallWriter{failAt: tc.failAt, err: want}
+			var testStderr bytes.Buffer
+			code := run(Options{
+				Animation: "plain",
+				Loops:     1,
+				Delay:     time.Millisecond,
+				Mono:      true,
+				Stdout:    writer,
+				Stderr:    &testStderr,
+			}, inv)
+			if code != 1 {
+				t.Fatalf("exit code = %d, want 1", code)
+			}
+			if !strings.Contains(testStderr.String(), want.Error()) {
+				t.Fatalf("stderr = %q", testStderr.String())
+			}
+		})
+	}
+}
+
 type failingWriter struct{ err error }
 
 func (w failingWriter) Write([]byte) (int, error) { return 0, w.err }
+
+type failOnCallWriter struct {
+	calls  int
+	failAt int
+	err    error
+}
+
+func (w *failOnCallWriter) Write(p []byte) (int, error) {
+	w.calls++
+	if w.calls == w.failAt {
+		return 0, w.err
+	}
+	return len(p), nil
+}
 
 func Test_PickAnimationName(t *testing.T) {
 	cases := []struct {
@@ -232,6 +296,18 @@ func Test_RunLoop_EmptyAnimationReturnsImmediately(t *testing.T) {
 	}
 	if buf.Len() != 0 {
 		t.Errorf("expected no output, got %q", buf.String())
+	}
+}
+
+func Test_RunLoop_ReportsTickerDrawFailure(t *testing.T) {
+	want := errors.New("second draw failed")
+	writer := &failOnCallWriter{failAt: 2, err: want}
+	r := render.NewRenderer(writer, true)
+	err := runLoop(r, animation.Animation{Frames: [][]byte{[]byte("A"), []byte("B")}}, loopOptions{
+		frameDelay: time.Millisecond,
+	})
+	if !errors.Is(err, want) {
+		t.Fatalf("error = %v, want %v", err, want)
 	}
 }
 

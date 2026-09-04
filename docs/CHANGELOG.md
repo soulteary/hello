@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The race-enabled statement-coverage floor is now 100% for local checks,
+  pull requests and tagged releases.
+
+### Fixed
+
+- Query reflection now also controls `X-Forwarded-Uri`, preventing proxy
+  headers containing sensitive query parameters from bypassing the default
+  diagnostic redaction.
+- Release validation rejects numeric SemVer prerelease identifiers with
+  leading zeroes, such as `v2.2.1-01`.
+
 ## [2.2.0] - 2026-09-04
 
 ### Added

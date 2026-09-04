@@ -4,12 +4,41 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/soulteary/hello/internal/httpserver"
 )
+
+func TestMainUsesReturnedExitCode(t *testing.T) {
+	originalArgs := os.Args
+	originalExit := exitProcess
+	t.Cleanup(func() {
+		os.Args = originalArgs
+		exitProcess = originalExit
+	})
+
+	os.Args = []string{"hello", "-version"}
+	got := -1
+	exitProcess = func(code int) { got = code }
+	main()
+	if got != 0 {
+		t.Fatalf("exit code = %d, want 0", got)
+	}
+}
+
+func TestBuildInfoVersion(t *testing.T) {
+	if got := buildInfoVersion(nil); got != "" {
+		t.Fatalf("nil build info version = %q, want empty", got)
+	}
+	info := &debug.BuildInfo{Main: debug.Module{Version: "v2.2.0"}}
+	if got := buildInfoVersion(info); got != "v2.2.0" {
+		t.Fatalf("build info version = %q, want v2.2.0", got)
+	}
+}
 
 func TestRunVersionHelpAndList(t *testing.T) {
 	tests := []struct {

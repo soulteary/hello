@@ -25,7 +25,7 @@ Optional extras:
 ```bash
 make fuzz    # fuzz the animation parser for 30s
 make bench   # run benchmarks
-make cover   # run tests and enforce the default 90% coverage floor
+make cover   # run tests and enforce the default 100% coverage floor
 make vuln    # scan reachable code and dependencies
 ```
 
