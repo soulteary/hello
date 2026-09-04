@@ -53,6 +53,10 @@ type Options struct {
 // code. It never calls os.Exit so that it stays testable; main translates
 // the returned code into os.Exit.
 func Run(opts Options) int {
+	return run(opts, animation.NewInventory())
+}
+
+func run(opts Options, inventory animation.Inventory) int {
 	if opts.Stdout == nil {
 		opts.Stdout = os.Stdout
 	}
@@ -71,8 +75,6 @@ func Run(opts Options) int {
 		fmt.Fprintln(opts.Stderr, "loops must be >= 0")
 		return 2
 	}
-
-	inventory := animation.NewInventory()
 
 	if opts.List {
 		for _, name := range availableAnimations(inventory) {

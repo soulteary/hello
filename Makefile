@@ -7,7 +7,7 @@ VERSION        ?= $(shell git describe --tags --always --dirty 2>/dev/null || ec
 LDFLAGS        := -s -w -X main.version=$(VERSION)
 DOCKER_IMAGE   ?= soulteary/hello
 DOCKER_TAG     ?= dev
-COVERAGE_MIN   ?= 90.0
+COVERAGE_MIN   ?= 100.0
 
 .DEFAULT_GOAL := help
 

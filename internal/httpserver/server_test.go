@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -205,6 +206,7 @@ func TestRootRedactsQueryAndIdentityByDefault(t *testing.T) {
 	req.Header.Set("X-Auth-Request-Access-Token", "must-not-leak-auth-request-token")
 	req.Header.Set("X-Forwarded-Access-Token", "must-not-leak-forwarded-token")
 	req.Header.Set("X-Forwarded-Authorization", "must-not-leak-forwarded-auth")
+	req.Header.Set("X-Forwarded-Uri", "/callback?token=must-not-leak-forwarded-uri")
 	req.Header.Set("Authorization", "Bearer must-not-leak-auth")
 	req.Header.Set("Cookie", "session=must-not-leak-cookie")
 	recorder := httptest.NewRecorder()
@@ -226,6 +228,7 @@ func TestRootRedactsQueryAndIdentityByDefault(t *testing.T) {
 	newSmallHandler(t, HandlerOptions{ReflectQuery: true, ReflectIdentity: true}).ServeHTTP(optIn, req)
 	for _, want := range []string{
 		"URL: /?token=must-not-leak-query",
+		"X-Forwarded-Uri: /callback?token=must-not-leak-forwarded-uri",
 		"X-Forwarded-User: test-admin-001",
 		"X-Auth-Email: admin@example.com",
 	} {
@@ -262,6 +265,24 @@ func TestHTMLTemplateEscapesVersion(t *testing.T) {
 	wantLink := `Project: <a href="` + projectURL + `">` + projectURL + `</a>`
 	if !strings.Contains(body, wantLink) {
 		t.Errorf("project footer is missing: %s", body)
+	}
+}
+
+func TestHTMLAndNonceFailures(t *testing.T) {
+	want := errors.New("random source failed")
+	if _, err := nonceFromReader(errorReader{err: want}); !errors.Is(err, want) {
+		t.Fatalf("nonce error = %v, want %v", err, want)
+	}
+
+	app := handler{name: "parrot", animation: smallInventory()["parrot"]}
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://hello.example/?format=html", nil)
+	app.writeHTML(recorder, req, func() (string, error) { return "", want })
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", recorder.Code)
+	}
+	if !strings.Contains(recorder.Body.String(), "build browser response") {
+		t.Fatalf("body = %q", recorder.Body.String())
 	}
 }
 
@@ -357,6 +378,7 @@ func TestSafeReflectedHeader(t *testing.T) {
 		"X-Forwarded-User":                false,
 		"X-Forwarded-For":                 true,
 		"X-Forwarded-Proto":               true,
+		"X-Forwarded-Uri":                 false,
 		"X-Auth-User":                     false,
 		"X-Auth-Email":                    false,
 		"X-Auth-Groups":                   false,
@@ -376,14 +398,17 @@ func TestSafeReflectedHeader(t *testing.T) {
 		"X-Random":                        false,
 	}
 	for name, want := range tests {
-		if got := safeReflectedHeader(name, false); got != want {
-			t.Errorf("safeReflectedHeader(%q, false) = %t, want %t", name, got, want)
+		if got := safeReflectedHeader(name, diagnosticOptions{}); got != want {
+			t.Errorf("safeReflectedHeader(%q, default options) = %t, want %t", name, got, want)
 		}
 	}
 	for _, name := range []string{"X-Forwarded-User", "X-Auth-User", "X-Auth-Email", "X-Auth-Groups", "X-Auth-Name", "X-Auth-Role", "X-Auth-Scopes"} {
-		if !safeReflectedHeader(name, true) {
-			t.Errorf("safeReflectedHeader(%q, true) = false, want true", name)
+		if !safeReflectedHeader(name, diagnosticOptions{identity: true}) {
+			t.Errorf("safeReflectedHeader(%q, identity opt-in) = false, want true", name)
 		}
+	}
+	if !safeReflectedHeader("X-Forwarded-Uri", diagnosticOptions{query: true}) {
+		t.Error("X-Forwarded-Uri was not enabled by query opt-in")
 	}
 }
 
@@ -416,6 +441,15 @@ func TestNewHandlerValidation(t *testing.T) {
 	if NewHandler("test") == nil {
 		t.Fatal("default handler is nil")
 	}
+}
+
+func TestMustHandlerPanicsOnConstructionFailure(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("mustHandler did not panic")
+		}
+	}()
+	mustHandler(nil, errors.New("construction failed"))
 }
 
 func TestEventStreamOverHTTP(t *testing.T) {
@@ -626,6 +660,102 @@ func TestStreamAnimationLifecycleAndErrors(t *testing.T) {
 	})
 }
 
+func TestStreamAnimationDelayedFailures(t *testing.T) {
+	anim := smallInventory()["parrot"]
+	want := errors.New("delayed failure")
+
+	t.Run("frame prepare", func(t *testing.T) {
+		calls := 0
+		err := streamAnimation(context.Background(), io.Discard, func() error {
+			calls++
+			if calls == 2 {
+				return want
+			}
+			return nil
+		}, nil, "parrot", anim, time.Millisecond, time.Hour, false)
+		if !errors.Is(err, want) {
+			t.Fatalf("error = %v, want %v", err, want)
+		}
+	})
+
+	t.Run("frame write", func(t *testing.T) {
+		writer := &failOnWrite{failAt: 2, err: want}
+		err := streamAnimation(context.Background(), writer, nil, nil, "parrot", anim, time.Millisecond, time.Hour, false)
+		if !errors.Is(err, want) {
+			t.Fatalf("error = %v, want %v", err, want)
+		}
+	})
+
+	t.Run("frame flush", func(t *testing.T) {
+		calls := 0
+		err := streamAnimation(context.Background(), io.Discard, nil, func() error {
+			calls++
+			if calls == 2 {
+				return want
+			}
+			return nil
+		}, "parrot", anim, time.Millisecond, time.Hour, false)
+		if !errors.Is(err, want) {
+			t.Fatalf("error = %v, want %v", err, want)
+		}
+	})
+
+	t.Run("heartbeat prepare", func(t *testing.T) {
+		calls := 0
+		err := streamAnimation(context.Background(), io.Discard, func() error {
+			calls++
+			if calls == 2 {
+				return want
+			}
+			return nil
+		}, nil, "parrot", anim, time.Hour, time.Millisecond, false)
+		if !errors.Is(err, want) {
+			t.Fatalf("error = %v, want %v", err, want)
+		}
+	})
+
+	t.Run("heartbeat write", func(t *testing.T) {
+		writer := &failOnWrite{failAt: 2, err: want}
+		err := streamAnimation(context.Background(), writer, nil, nil, "parrot", anim, time.Hour, time.Millisecond, false)
+		if !errors.Is(err, want) {
+			t.Fatalf("error = %v, want %v", err, want)
+		}
+	})
+
+	t.Run("heartbeat flush", func(t *testing.T) {
+		calls := 0
+		err := streamAnimation(context.Background(), io.Discard, nil, func() error {
+			calls++
+			if calls == 2 {
+				return want
+			}
+			return nil
+		}, "parrot", anim, time.Hour, time.Millisecond, false)
+		if !errors.Is(err, want) {
+			t.Fatalf("error = %v, want %v", err, want)
+		}
+	})
+
+	t.Run("heartbeat without flush", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		writer := &cancelOnWrite{cancelAt: 2, cancel: cancel}
+		err := streamAnimation(ctx, writer, nil, nil, "parrot", anim, time.Hour, time.Millisecond, false)
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("error = %v, want context.Canceled", err)
+		}
+	})
+}
+
+func TestWriteFrameEventMarshalFailure(t *testing.T) {
+	want := errors.New("marshal failed")
+	err := writeFrameEventWithMarshal(io.Discard, 1, frameEvent{}, func(any) ([]byte, error) {
+		return nil, want
+	})
+	if !errors.Is(err, want) {
+		t.Fatalf("error = %v, want %v", err, want)
+	}
+}
+
 func TestEventsRejectsNonFlushingWriter(t *testing.T) {
 	writer := &basicResponseWriter{header: make(http.Header)}
 	req := httptest.NewRequest(http.MethodGet, "http://hello.example/events", nil)
@@ -656,6 +786,32 @@ func TestEventsStreamsThroughUnwrapCapableWriter(t *testing.T) {
 	}
 }
 
+func TestEventsHandleControllerFailures(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://hello.example/events", nil)
+	app := newSmallHandler(t, HandlerOptions{})
+
+	deadlineWriter := &deadlineErrorResponseWriter{
+		basicResponseWriter: basicResponseWriter{header: make(http.Header)},
+		err:                 errors.New("deadline failed"),
+	}
+	app.ServeHTTP(deadlineWriter, req)
+	if deadlineWriter.status != http.StatusInternalServerError {
+		t.Fatalf("deadline error status = %d, want 500", deadlineWriter.status)
+	}
+	if !strings.Contains(deadlineWriter.body.String(), "streaming unavailable") {
+		t.Fatalf("deadline error body = %q", deadlineWriter.body.String())
+	}
+
+	flushWriter := &flushErrorResponseWriter{
+		basicResponseWriter: basicResponseWriter{header: make(http.Header)},
+		err:                 errors.New("flush failed"),
+	}
+	app.ServeHTTP(flushWriter, req)
+	if flushWriter.flushes != 1 {
+		t.Fatalf("flush calls = %d, want 1", flushWriter.flushes)
+	}
+}
+
 func TestWriteTextResponseNewlineHandling(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://hello.example/", nil)
 	for _, frame := range []string{"", "A", "A\n"} {
@@ -669,6 +825,22 @@ func TestWriteTextResponseNewlineHandling(t *testing.T) {
 		}
 		if !strings.HasSuffix(output.String(), "Project: "+projectURL+"\n") {
 			t.Errorf("project is not the final line: %q", output.String())
+		}
+	}
+}
+
+func TestWriteRequestSummaryOptionalFields(t *testing.T) {
+	req := &http.Request{
+		Method: http.MethodGet,
+		URL:    &url.URL{},
+		Host:   "hello.example",
+		Header: http.Header{"X-Forwarded-For": []string{"192.0.2.1", "192.0.2.2"}},
+	}
+	var output bytes.Buffer
+	writeRequestSummary(&output, req, "2.2.0", diagnosticOptions{hostname: true})
+	for _, want := range []string{"Version: 2.2.0", "Hostname: ", "URL: /", "X-Forwarded-For: 192.0.2.1", "X-Forwarded-For: 192.0.2.2"} {
+		if !strings.Contains(output.String(), want) {
+			t.Errorf("summary does not contain %q: %s", want, output.String())
 		}
 	}
 }
@@ -725,6 +897,52 @@ func TestRunValidationListenFailureAndShutdown(t *testing.T) {
 	if !strings.Contains(stdout.String(), "hello HTTP server listening on") {
 		t.Errorf("startup message missing: %s", stdout.String())
 	}
+
+	ctx, cancel = context.WithCancel(context.Background())
+	cancel()
+	if err := Run(ctx, Options{Addr: "127.0.0.1:0"}); err != nil {
+		t.Fatalf("default stdout graceful shutdown: %v", err)
+	}
+}
+
+func TestServeLifecycle(t *testing.T) {
+	want := errors.New("serve failed")
+	for _, tc := range []struct {
+		name       string
+		server     *fakeServerLifecycle
+		cancel     bool
+		wantErr    error
+		wantClosed bool
+	}{
+		{name: "server closed before cancellation", server: newFakeServer(http.ErrServerClosed, nil, false)},
+		{name: "serve failure", server: newFakeServer(want, nil, false), wantErr: want},
+		{name: "graceful shutdown", server: newFakeServer(http.ErrServerClosed, nil, true), cancel: true},
+		{name: "post-shutdown serve failure", server: newFakeServer(want, nil, true), cancel: true, wantErr: want},
+		{name: "shutdown failure closes server", server: newFakeServer(http.ErrServerClosed, want, true), cancel: true, wantErr: want, wantClosed: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			if tc.cancel {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+			var stdout bytes.Buffer
+			err := serve(ctx, tc.server, stubListener{}, &stdout)
+			if tc.wantErr == nil && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantErr != nil && !errors.Is(err, tc.wantErr) {
+				t.Fatalf("error = %v, want %v", err, tc.wantErr)
+			}
+			if tc.server.closed != tc.wantClosed {
+				t.Fatalf("closed = %t, want %t", tc.server.closed, tc.wantClosed)
+			}
+			if !strings.Contains(stdout.String(), "hello HTTP server listening on") {
+				t.Fatalf("startup output = %q", stdout.String())
+			}
+		})
+	}
 }
 
 func TestRunCancelsActiveEventStreams(t *testing.T) {
@@ -776,10 +994,109 @@ func (w errorWriter) Write([]byte) (int, error) {
 	return 0, w.err
 }
 
+type errorReader struct{ err error }
+
+func (r errorReader) Read([]byte) (int, error) { return 0, r.err }
+
+type failOnWrite struct {
+	calls  int
+	failAt int
+	err    error
+}
+
+func (w *failOnWrite) Write(p []byte) (int, error) {
+	w.calls++
+	if w.calls == w.failAt {
+		return 0, w.err
+	}
+	return len(p), nil
+}
+
+type cancelOnWrite struct {
+	calls    int
+	cancelAt int
+	cancel   context.CancelFunc
+}
+
+func (w *cancelOnWrite) Write(p []byte) (int, error) {
+	w.calls++
+	if w.calls == w.cancelAt {
+		w.cancel()
+	}
+	return len(p), nil
+}
+
 type basicResponseWriter struct {
 	header http.Header
 	status int
 	body   bytes.Buffer
+}
+
+type deadlineErrorResponseWriter struct {
+	basicResponseWriter
+	err error
+}
+
+func (w *deadlineErrorResponseWriter) SetWriteDeadline(time.Time) error { return w.err }
+
+type flushErrorResponseWriter struct {
+	basicResponseWriter
+	err     error
+	flushes int
+}
+
+func (w *flushErrorResponseWriter) SetWriteDeadline(time.Time) error { return nil }
+
+func (w *flushErrorResponseWriter) FlushError() error {
+	w.flushes++
+	return w.err
+}
+
+type stubListener struct{}
+
+func (stubListener) Accept() (net.Conn, error) { return nil, errors.New("unused") }
+func (stubListener) Close() error              { return nil }
+func (stubListener) Addr() net.Addr            { return stubAddr("127.0.0.1:12345") }
+
+type stubAddr string
+
+func (a stubAddr) Network() string { return "tcp" }
+func (a stubAddr) String() string  { return string(a) }
+
+type fakeServerLifecycle struct {
+	serveErr        error
+	shutdownErr     error
+	waitForShutdown bool
+	shutdown        chan struct{}
+	shutdownOnce    sync.Once
+	closed          bool
+}
+
+func newFakeServer(serveErr, shutdownErr error, waitForShutdown bool) *fakeServerLifecycle {
+	return &fakeServerLifecycle{
+		serveErr:        serveErr,
+		shutdownErr:     shutdownErr,
+		waitForShutdown: waitForShutdown,
+		shutdown:        make(chan struct{}),
+	}
+}
+
+func (s *fakeServerLifecycle) Serve(net.Listener) error {
+	if s.waitForShutdown {
+		<-s.shutdown
+	}
+	return s.serveErr
+}
+
+func (s *fakeServerLifecycle) Shutdown(context.Context) error {
+	s.shutdownOnce.Do(func() { close(s.shutdown) })
+	return s.shutdownErr
+}
+
+func (s *fakeServerLifecycle) Close() error {
+	s.closed = true
+	s.shutdownOnce.Do(func() { close(s.shutdown) })
+	return nil
 }
 
 type readyWriter struct {

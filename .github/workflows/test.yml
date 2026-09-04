@@ -55,7 +55,7 @@ jobs:
           version: v2.13.2
 
       - name: go test (race + cover)
-        run: make cover COVERAGE_MIN=90.0
+        run: make cover COVERAGE_MIN=100.0
 
       - name: Upload coverage artifact
         if: always()
