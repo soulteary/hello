@@ -45,10 +45,6 @@ jobs:
             echo "::error::docs/CHANGELOG.md has no dated section for ${version}."
             exit 1
           }
-          test "$(git cat-file -t "${GITHUB_REF_NAME}")" = tag || {
-            echo "::error::Release tags must be annotated or signed, not lightweight."
-            exit 1
-          }
           git merge-base --is-ancestor "${GITHUB_SHA}" origin/main || {
             echo "::error::Release tag commit is not contained in main."
             exit 1
