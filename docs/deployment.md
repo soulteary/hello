@@ -12,12 +12,20 @@ Hub and GitHub Container Registry:
 | Tag | Meaning |
 | --- | --- |
 | `2.3.0` | Immutable release version; preferred for deployments. |
-| `2.2` / `2` | Moving minor and major aliases. |
+| `2.3` / `2` | Moving minor and major aliases. |
 | `latest` | Most recently published release. |
 | `main` | Latest successful build from the default branch. |
 
 Use `ghcr.io/soulteary/hello:2.3.0` or `soulteary/hello:2.3.0`. See
 [`verification.md`](verification.md) before promoting a new version.
+
+Before deploying to a new host, check that it can pull and run the image. The
+command prints one plain-text frame and exits, with no TTY or open port
+required:
+
+```bash
+docker run --rm ghcr.io/soulteary/hello:2.3.0 -once
+```
 
 ## Docker Compose
 

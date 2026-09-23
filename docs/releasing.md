@@ -37,6 +37,7 @@ Build and smoke-test the container when Docker is available:
 
 ```bash
 make docker DOCKER_TAG=release-candidate
+docker run --rm soulteary/hello:release-candidate -once
 docker run --rm soulteary/hello:release-candidate -loops 1
 docker run --rm -p 8080:8080 soulteary/hello:release-candidate -listen :8080
 ```
@@ -106,6 +107,8 @@ Confirm all jobs are green, then inspect the published result:
 - the version-tag build, rather than an earlier `main` build, updates `latest`;
 - `hello -version` reports `${VERSION}` in both a downloaded binary and
   container;
+- `docker run --rm <image> -once` prints one plain frame and exits `0` for
+  both registries without `-it`;
 - curl, browser animation, `/events` and `/healthz` work from the published
   image.
 

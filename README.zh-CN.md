@@ -28,6 +28,14 @@ docker run --rm -it soulteary/hello
 docker run --rm soulteary/hello -loops 1
 ```
 
+只想验证 Docker 能否正常拉取并运行容器时，可以只输出一帧后立即退出。`-once`
+输出不含 ANSI 转义序列的纯 ASCII 文本，因此不需要 `-it`，也适合脚本和 CI 日志：
+
+```bash
+docker run --rm soulteary/hello -once
+docker run --rm soulteary/hello -once cat
+```
+
 镜像同时发布到 Docker Hub 与 GitHub Container Registry：
 
 ```bash
@@ -117,7 +125,7 @@ docker run --rm -p 8080:8080 ghcr.io/soulteary/hello \
 - `-delay` 决定 SSE 推送帧间隔。
 - `-mono` 关闭浏览器颜色循环。
 - `-http-max-streams` 限制并发 SSE 客户端，默认值为 `64`。
-- `-loops`、`-list` 不能与 `-listen` 组合使用。
+- `-loops`、`-once`、`-list` 不能与 `-listen` 组合使用。
 
 服务设置了请求和请求头超时，并支持 `SIGINT` / `SIGTERM` 优雅退出。SSE 每次
 写入使用独立截止时间，因此不会被较短的全局响应超时误切断。若 `/events` 前方
@@ -179,6 +187,7 @@ docker run --rm soulteary/hello -list
 | `-loops` | 终端循环次数；`0` 表示无限。 | `0` |
 | `-delay` | 帧间隔（毫秒）；范围 `1`–`60000`。 | `75` |
 | `-mono` | 关闭彩虹色。 | `false` |
+| `-once` | 以纯文本输出第一帧后退出；不能与 `-loops` 组合使用。 | `false` |
 | `-list` | 列出内置动画并退出。 | `false` |
 | `-listen` | 监听 HTTP，而不是进入终端播放循环。 | `""` |
 | `-http-max-streams` | HTTP 模式允许的最大并发 SSE 客户端数。 | `64` |
@@ -217,7 +226,8 @@ distroless 基础镜像中，并在 `/usr/share/licenses/hello/` 保留相同文
 ## 终端兼容性
 
 终端动画依赖 ANSI 光标控制与 256 色转义序列。如果终端不支持，请使用
-`-mono`；也可增加 `-loops 1`，避免无法正确显示的动画无限运行。
+`-mono`；也可增加 `-loops 1`，避免无法正确显示的动画无限运行。`-once` 完全不输出
+转义序列，只打印一帧，适合日志、管道和未分配 TTY 的容器。
 
 Windows 建议使用 Windows Terminal 或较新的 PowerShell。旧版 `cmd.exe`
 可能无法正确渲染颜色和光标控制序列。

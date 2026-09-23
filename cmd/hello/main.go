@@ -77,6 +77,7 @@ func runWithServer(args []string, stdout, stderr io.Writer, serve serverRunner) 
 	mono := fs.Bool("mono", false, "disable rainbow colors")
 	delay := fs.Int("delay", 75, "terminal/SSE frame delay in ms (1-60000)")
 	list := fs.Bool("list", false, "list available animations and exit")
+	once := fs.Bool("once", false, "print one plain-text frame and exit, e.g. to verify a container runs (unavailable with -listen or -loops)")
 	listen := fs.String("listen", "", "serve HTTP on this address instead of playing an animation (for example, :8080)")
 	maxStreams := fs.Int("http-max-streams", 64, "maximum concurrent SSE streams (unavailable without -listen)")
 	reflectQuery := fs.Bool("reflect-query", false, "include the raw URL query in text diagnostics (unavailable without -listen)")
@@ -122,6 +123,11 @@ func runWithServer(args []string, stdout, stderr io.Writer, serve serverRunner) 
 		return 2
 	}
 
+	if *once && *loops != 0 {
+		fmt.Fprintln(stderr, "once cannot be combined with loops")
+		return 2
+	}
+
 	animationName := cli.ResolveAnimation(animationFlag, fs.Args())
 
 	if addr := strings.TrimSpace(*listen); addr != "" {
@@ -131,6 +137,10 @@ func runWithServer(args []string, stdout, stderr io.Writer, serve serverRunner) 
 		}
 		if *loops != 0 {
 			fmt.Fprintln(stderr, "listen cannot be combined with loops")
+			return 2
+		}
+		if *once {
+			fmt.Fprintln(stderr, "listen cannot be combined with once")
 			return 2
 		}
 		if *maxStreams <= 0 {
@@ -163,6 +173,7 @@ func runWithServer(args []string, stdout, stderr io.Writer, serve serverRunner) 
 		Delay:     time.Duration(*delay) * time.Millisecond,
 		Mono:      *mono,
 		List:      *list,
+		Once:      *once,
 		Stdout:    stdout,
 		Stderr:    stderr,
 	})
