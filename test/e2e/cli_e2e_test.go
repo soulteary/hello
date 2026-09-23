@@ -97,6 +97,19 @@ func Test_CLI_List(t *testing.T) {
 	}
 }
 
+func Test_CLI_OncePrintsPlainFrame(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping e2e test in -short mode")
+	}
+	out, code := runCLI(t, "-once", "loading")
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (output: %s)", code, out)
+	}
+	if out != "   Loading |\n" {
+		t.Errorf("expected one plain frame, got %q", out)
+	}
+}
+
 func Test_CLI_UnknownAnimationExitsOne(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping e2e test in -short mode")

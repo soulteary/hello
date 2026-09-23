@@ -30,6 +30,15 @@ want a one-shot container:
 docker run --rm soulteary/hello -loops 1
 ```
 
+To check that Docker can pull and run a container, print a single frame and
+exit. `-once` writes plain ASCII without ANSI escapes, so it needs no `-it` and
+is safe in scripts and CI logs:
+
+```bash
+docker run --rm soulteary/hello -once
+docker run --rm soulteary/hello -once cat
+```
+
 Images are published to both Docker Hub and GitHub Container Registry:
 
 ```bash
@@ -126,7 +135,7 @@ docker run --rm -p 8080:8080 ghcr.io/soulteary/hello \
 - `-delay` controls the SSE frame interval.
 - `-mono` disables browser color cycling.
 - `-http-max-streams` bounds concurrent SSE clients; the default is `64`.
-- `-loops` and `-list` cannot be combined with `-listen`.
+- `-loops`, `-once` and `-list` cannot be combined with `-listen`.
 
 The server has bounded request/header timeouts and graceful `SIGINT`/`SIGTERM`
 shutdown. Streaming writes receive their own deadlines so an SSE connection is
@@ -194,6 +203,7 @@ animation or understand its metadata and frame separators.
 | `-loops` | Number of terminal loops; `0` means infinite. | `0` |
 | `-delay` | Frame interval in milliseconds; range `1`–`60000`. | `75` |
 | `-mono` | Disable rainbow colors. | `false` |
+| `-once` | Print the first frame as plain text and exit; cannot be combined with `-loops`. | `false` |
 | `-list` | List embedded animations and exit. | `false` |
 | `-listen` | Listen for HTTP requests instead of running the terminal loop. | `""` |
 | `-http-max-streams` | Maximum concurrent SSE clients in HTTP mode. | `64` |

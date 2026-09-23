@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -23,6 +24,7 @@ Examples:
   hello -list                # list all available animations
   hello -mono -delay 120     # disable rainbow, slower frames
   hello -loops 3 pedro       # play pedro for 3 loops then exit
+  hello -once                # print one plain frame and exit (smoke test)
   hello -listen :8080        # serve HTTP instead of playing an animation
   hello -listen :8080 -a cat # serve cat to curl and browsers
 `
@@ -44,6 +46,10 @@ type Options struct {
 	Delay     time.Duration
 	Mono      bool
 	List      bool
+	// Once prints the first frame as plain text, without ANSI control
+	// sequences, and exits. It is intended for smoke tests such as
+	// `docker run --rm soulteary/hello -once`.
+	Once bool
 
 	Stdout io.Writer
 	Stderr io.Writer
@@ -100,6 +106,14 @@ func run(opts Options, inventory animation.Inventory) int {
 		return 1
 	}
 
+	if opts.Once {
+		if err := writeFirstFrame(opts.Stdout, anim); err != nil {
+			fmt.Fprintf(opts.Stderr, "write output: %v\n", err)
+			return 1
+		}
+		return 0
+	}
+
 	renderer := render.NewRenderer(opts.Stdout, opts.Mono)
 	stop, cleanup := installSignalHandler()
 	defer cleanup()
@@ -124,6 +138,18 @@ func run(opts Options, inventory animation.Inventory) int {
 		return 1
 	}
 	return 0
+}
+
+// writeFirstFrame writes the animation's first frame as raw text terminated
+// by exactly one newline. No cursor or color sequences are emitted, so the
+// output is stable in logs, pipes and containers started without a TTY.
+func writeFirstFrame(w io.Writer, anim animation.Animation) error {
+	if len(anim.Frames) == 0 {
+		return nil
+	}
+	frame := bytes.TrimRight(anim.Frames[0], "\n")
+	_, err := w.Write(append(frame[:len(frame):len(frame)], '\n'))
+	return err
 }
 
 // availableAnimations returns the sorted list of animation names present in

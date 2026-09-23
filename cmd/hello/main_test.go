@@ -105,6 +105,8 @@ func TestRunValidatesArguments(t *testing.T) {
 		{name: "bad integer", args: []string{"-delay", "nope"}, want: "invalid value"},
 		{name: "listen with list", args: []string{"-listen", ":8080", "-list"}, want: "cannot be combined with list"},
 		{name: "listen with loops", args: []string{"-listen", ":8080", "-loops", "1"}, want: "cannot be combined with loops"},
+		{name: "listen with once", args: []string{"-listen", ":8080", "-once"}, want: "cannot be combined with once"},
+		{name: "once with loops", args: []string{"-once", "-loops", "1"}, want: "once cannot be combined with loops"},
 		{name: "invalid stream limit", args: []string{"-listen", ":8080", "-http-max-streams", "0"}, want: "http-max-streams must be > 0"},
 	}
 	for _, tc := range tests {
@@ -148,6 +150,16 @@ func TestRunDispatchesTerminalMode(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "not found") {
 		t.Errorf("unknown animation error missing: %s", stderr.String())
+	}
+}
+
+func TestRunOnce(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"-once", "loading"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+	if got, want := stdout.String(), "   Loading |\n"; got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
 	}
 }
 

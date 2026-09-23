@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A `-once` flag that prints the first frame of the selected animation as
+  plain ASCII, without ANSI control sequences, and exits. It is a quick way to
+  verify that Docker can run the image: `docker run --rm soulteary/hello -once`.
+
 ## [2.3.0] - 2026-09-04
 
 ### Changed

@@ -59,6 +59,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(docker run --rm hello:smoke -version)" = "${EXPECTED_VERSION}"
+          test "$(docker run --rm hello:smoke -once loading)" = "   Loading |"
 
           image_user="$(docker inspect --format '{{.Config.User}}' hello:smoke)"
           case "${image_user}" in

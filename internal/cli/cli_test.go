@@ -353,3 +353,39 @@ func Test_InstallSignalHandler_Cleanup(t *testing.T) {
 	cleanup() // must not panic and must be idempotent w.r.t. signal.Stop
 	cleanup()
 }
+
+func Test_RunOncePrintsPlainFirstFrame(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := Run(Options{Once: true, Animation: "loading", Delay: time.Millisecond, Stdout: &stdout, Stderr: &stderr}); code != 0 {
+		t.Fatalf("exit code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+	if got, want := stdout.String(), "   Loading |\n"; got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
+	}
+
+	inv := animation.Inventory{
+		"trailing": {Frames: [][]byte{[]byte("first\n\n"), []byte("second")}},
+		"bare":     {Frames: [][]byte{[]byte("first!--FRAME--!\n")[:5], []byte("second")}},
+		"empty":    {},
+	}
+	for name, want := range map[string]string{"trailing": "first\n", "bare": "first\n", "empty": ""} {
+		stdout.Reset()
+		if code := run(Options{Once: true, Animation: name, Delay: time.Millisecond, Stdout: &stdout, Stderr: &stderr}, inv); code != 0 {
+			t.Fatalf("%s: exit code = %d, want 0", name, code)
+		}
+		if stdout.String() != want {
+			t.Errorf("%s: stdout = %q, want %q", name, stdout.String(), want)
+		}
+	}
+	if got := string(inv["bare"].Frames[0][:6]); got != "first!" {
+		t.Errorf("once mutated the shared frame buffer: %q", got)
+	}
+
+	stderr.Reset()
+	if code := Run(Options{Once: true, Delay: time.Millisecond, Stdout: failingWriter{err: errors.New("closed pipe")}, Stderr: &stderr}); code != 1 {
+		t.Fatalf("write failure exit code = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "write output: closed pipe") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
