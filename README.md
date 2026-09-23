@@ -246,7 +246,8 @@ published; the incident is recorded in the [changelog](docs/CHANGELOG.md).
 
 Terminal animation uses ANSI cursor and 256-color escape sequences. If your
 terminal does not support them, use `-mono`; use `-loops 1` to avoid leaving an
-unusable infinite animation running.
+unusable infinite animation running. `-once` emits no escape sequences at all
+and prints a single frame, which suits logs, pipes and non-TTY containers.
 
 On Windows, prefer Windows Terminal or a recent PowerShell. Legacy `cmd.exe`
 may not render the colors or cursor controls correctly.

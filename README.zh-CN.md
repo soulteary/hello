@@ -226,7 +226,8 @@ distroless 基础镜像中，并在 `/usr/share/licenses/hello/` 保留相同文
 ## 终端兼容性
 
 终端动画依赖 ANSI 光标控制与 256 色转义序列。如果终端不支持，请使用
-`-mono`；也可增加 `-loops 1`，避免无法正确显示的动画无限运行。
+`-mono`；也可增加 `-loops 1`，避免无法正确显示的动画无限运行。`-once` 完全不输出
+转义序列，只打印一帧，适合日志、管道和未分配 TTY 的容器。
 
 Windows 建议使用 Windows Terminal 或较新的 PowerShell。旧版 `cmd.exe`
 可能无法正确渲染颜色和光标控制序列。

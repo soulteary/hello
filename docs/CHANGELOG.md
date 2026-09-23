@@ -7,13 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-09-23
+
+The `v2.2.0` tag was published from the commit that first prepared these notes,
+so its archives and images already include the Changed and Fixed entries
+below. `-once` is the first change that is new in 2.3.0.
+
 ### Added
 
 - A `-once` flag that prints the first frame of the selected animation as
-  plain ASCII, without ANSI control sequences, and exits. It is a quick way to
-  verify that Docker can run the image: `docker run --rm soulteary/hello -once`.
-
-## [2.3.0] - 2026-09-04
+  plain ASCII, without ANSI control sequences, and exits with status 0. It
+  needs no TTY, so `docker run --rm soulteary/hello -once` is a quick check that
+  Docker can pull and run the image. It cannot be combined with `-listen` or
+  `-loops`.
+- The container smoke test asserts the exact `-once` output.
 
 ### Changed
 
@@ -181,7 +188,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Third-party GitHub Actions are pinned to reviewed full commit SHAs.
 
 [Unreleased]: https://github.com/soulteary/hello/compare/v2.3.0...HEAD
-[2.3.0]: https://github.com/soulteary/hello/compare/03df0322798c81ddec4184af20704c663fbafd3a...v2.3.0
-[2.2.0]: https://github.com/soulteary/hello/compare/v2.1.0...03df0322798c81ddec4184af20704c663fbafd3a
+[2.3.0]: https://github.com/soulteary/hello/compare/v2.2.0...v2.3.0
+[2.2.0]: https://github.com/soulteary/hello/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/soulteary/hello/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/soulteary/hello/compare/v1.0.24...v2.0.0

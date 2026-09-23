@@ -60,3 +60,19 @@ docker image inspect --format '{{index .RepoDigests 0}}' "${IMAGE}"
 
 Use the returned `name@sha256:...` value in production manifests when alias
 movement is not acceptable.
+
+## Runtime smoke test
+
+Once the image is verified, confirm that the local Docker engine can run it.
+`-once` prints the first frame as plain ASCII and exits, so it works without a
+TTY and produces stable output for scripts:
+
+```bash
+docker run --rm "${IMAGE}" -version
+docker run --rm "${IMAGE}" -once
+test "$(docker run --rm "${IMAGE}" -once loading)" = "   Loading |"
+```
+
+A non-zero exit status or missing output points to a pull, platform or runtime
+problem rather than to the terminal. Use `-listen` and `/healthz` to check the
+HTTP path separately.
