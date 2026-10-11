@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-10-11
+
+### Changed
+
+- Build release binaries and containers with Go 1.27.2.
+- Refresh pinned CI actions and Go quality-check tools. The application
+  continues to have no third-party runtime dependencies.
+
 ## [2.3.0] - 2026-09-23
 
 The `v2.2.0` tag was published from the commit that first prepared these notes,
