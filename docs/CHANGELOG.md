@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Store keyless container signatures using the detached format on Docker Hub and GHCR, retaining certificate identity, issuer, and transparency-log verification.
+- Wait briefly for newly uploaded OCI signatures to become discoverable, retrying only the missing-signature condition and preserving all identity, issuer, certificate, and transparency-log checks.
 
 - Upgrade Cosign to v3.1.4 so signatures are attached correctly to image indexes
   containing Buildx attestations; sign and verify each registry artifact separately.
