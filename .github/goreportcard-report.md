@@ -11,10 +11,10 @@
 
 | Check | Score |
 | ----- | ----- |
-| gofmt | 100% |
 | go_vet | 100% |
-| ineffassign | 100% |
+| gofmt | 100% |
 | gocyclo | 71% |
+| ineffassign | 100% |
 | license | 100% |
 | misspell | 100% |
 
@@ -22,8 +22,6 @@
 
 ### gocyclo
 
-- `internal/cli/cli.go`
-  - Line 65: cyclomatic complexity 16 for function run
 - `internal/httpserver/server.go`
   - Line 563: cyclomatic complexity 23 for function streamAnimation
 - `internal/httpserver/server_test.go`
@@ -31,6 +29,8 @@
   - Line 862: cyclomatic complexity 16 for function TestRunValidationListenFailureAndShutdown
 - `cmd/hello/main.go`
   - Line 62: cyclomatic complexity 19 for function runWithServer
+- `internal/cli/cli.go`
+  - Line 65: cyclomatic complexity 16 for function run
 
 ---
 
