@@ -228,9 +228,9 @@ jobs:
             cosign sign --yes "${image}"
             # OCI referrers can become visible after the image upload returns.
             for attempt in {1..6}; do
-              if cosign verify \\
-                --certificate-identity-regexp '^https://github.com/soulteary/hello/.github/workflows/docker.yml@refs/(heads/main|tags/v.*)$' \\
-                --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \\
+              if cosign verify \
+                --certificate-identity-regexp '^https://github.com/soulteary/hello/.github/workflows/docker.yml@refs/(heads/main|tags/v.*)$' \
+                --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
                 "${image}" >/dev/null; then
                 break
               else
