@@ -224,9 +224,9 @@ jobs:
             [[ -n "${tag}" ]] && images+=("${tag}@${DIGEST}")
           done <<< "${TAGS}"
           for image in "${images[@]}"; do
-            # Cosign bundles are associated with one artifact at a time.
-            cosign sign --yes "${image}"
-            cosign verify \
+            # Store detached signatures consistently across Docker Hub and GHCR.
+            cosign sign --yes --new-bundle-format=false --registry-referrers-mode=legacy "${image}"
+            cosign verify --new-bundle-format=false \
               --certificate-identity-regexp '^https://github.com/soulteary/hello/.github/workflows/docker.yml@refs/(heads/main|tags/v.*)$' \
               --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
               "${image}" >/dev/null

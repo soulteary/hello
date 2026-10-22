@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Store keyless container signatures using the detached format on Docker Hub and GHCR, retaining certificate identity, issuer, and transparency-log verification.
+
 - Upgrade Cosign to v3.1.4 so signatures are attached correctly to image indexes
   containing Buildx attestations; sign and verify each registry artifact separately.
 - Include dated release notes for the Go 1.27.3 upgrade.
