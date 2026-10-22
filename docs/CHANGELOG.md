@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.3] - 2026-10-22
+
+### Fixed
+
+- Upgrade Cosign to v3.1.4 so signatures are attached correctly to image indexes
+  containing Buildx attestations; sign and verify each registry artifact separately.
+- Include dated release notes for the Go 1.27.3 upgrade.
+
+## [2.3.2] - 2026-10-22
+
+### Changed
+
+- Require Go 1.27.3 and update the pinned official Go builder image.
+- Restore the project toolchain after CI report actions.
+
+### Known issues
+
+- Release verification rejected the missing dated changelog entry and container
+  signature discovery failed with the older Cosign version. Superseded by 2.3.3.
+
 ## [2.3.1] - 2026-10-11
 
 ### Changed
