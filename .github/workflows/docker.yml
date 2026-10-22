@@ -192,6 +192,8 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.4
 
       - name: Build and push
         id: build
@@ -221,8 +223,9 @@ jobs:
           while IFS= read -r tag; do
             [[ -n "${tag}" ]] && images+=("${tag}@${DIGEST}")
           done <<< "${TAGS}"
-          cosign sign --yes "${images[@]}"
           for image in "${images[@]}"; do
+            # Cosign bundles are associated with one artifact at a time.
+            cosign sign --yes "${image}"
             cosign verify \
               --certificate-identity-regexp '^https://github.com/soulteary/hello/.github/workflows/docker.yml@refs/(heads/main|tags/v.*)$' \
               --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
