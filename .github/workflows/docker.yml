@@ -226,8 +226,22 @@ jobs:
           for image in "${images[@]}"; do
             # Cosign bundles are associated with one artifact at a time.
             cosign sign --yes "${image}"
-            cosign verify \
-              --certificate-identity-regexp '^https://github.com/soulteary/hello/.github/workflows/docker.yml@refs/(heads/main|tags/v.*)$' \
-              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
-              "${image}" >/dev/null
+            # OCI referrers can become visible after the image upload returns.
+            for attempt in {1..6}; do
+              if cosign verify \
+                --certificate-identity-regexp '^https://github.com/soulteary/hello/.github/workflows/docker.yml@refs/(heads/main|tags/v.*)$' \
+                --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+                "${image}" >/dev/null; then
+                break
+              else
+                status=$?
+              fi
+              # Exit 10 means signatures are not discoverable yet. Never retry
+              # identity, issuer, certificate, or transparency-log failures.
+              if [[ "${status}" -ne 10 || "${attempt}" -eq 6 ]]; then
+                exit "${status}"
+              fi
+              echo "Signature not visible yet; retrying verification in 10 seconds (${attempt}/6)."
+              sleep 10
+            done
           done
