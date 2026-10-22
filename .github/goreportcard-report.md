@@ -22,15 +22,15 @@
 
 ### gocyclo
 
+- `cmd/hello/main.go`
+  - Line 62: cyclomatic complexity 19 for function runWithServer
+- `internal/cli/cli.go`
+  - Line 65: cyclomatic complexity 16 for function run
 - `internal/httpserver/server.go`
   - Line 563: cyclomatic complexity 23 for function streamAnimation
 - `internal/httpserver/server_test.go`
   - Line 552: cyclomatic complexity 20 for function TestStreamAnimationLifecycleAndErrors
   - Line 862: cyclomatic complexity 16 for function TestRunValidationListenFailureAndShutdown
-- `cmd/hello/main.go`
-  - Line 62: cyclomatic complexity 19 for function runWithServer
-- `internal/cli/cli.go`
-  - Line 65: cyclomatic complexity 16 for function run
 
 ---
 
