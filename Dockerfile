@@ -2,7 +2,7 @@
 
 # ---------- build stage ----------
 # Pin a Go version that matches go.mod's `go 1.27.3` directive.
-FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine@sha256:d530cf60723abf1ffae0cd16bb546b379ec0550d2f3815e5b16ed69dbc00fba4 AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine3.24@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS build
 
 # TARGETOS/TARGETARCH are provided by buildx for multi-arch builds.
 ARG TARGETOS
